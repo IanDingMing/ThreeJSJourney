@@ -8,9 +8,10 @@ const sizes = {
 };
 const webgl = useTemplateRef("webgl");
 onMounted(() => {
-  console.log(webgl);
-  webgl.value!.width = sizes.width;
-  webgl.value!.height = sizes.height;
+  // console.log(webgl);
+  // 用 style 设置 div 的宽高
+  webgl.value!.style.width = sizes.width + "px";
+  webgl.value!.style.height = sizes.height + "px";
 
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
@@ -25,7 +26,22 @@ onMounted(() => {
 
   // 两个参数分别为几何体geometry、材质material
   const mesh = new THREE.Mesh(geometry, material); //网格模型对象Mesh
+  // mesh.position.x = 1; // 设置网格模型在x轴上的位置
+  // mesh.position.y = -1; // 设置网格模型在y轴上的位置
+  // mesh.position.z = 1; // 设置网格模型在z轴上的位置
+  mesh.position.set(0, 0, 0); // 设置网格模型在x、y、z轴上的位置
+
+  mesh.scale.set(2, 0.5, 0.5); // 设置网格模型的缩放比例
+
+  mesh.rotation.reorder("XYZ"); // 设置网格模型的旋转顺序
+  mesh.rotation.set(Math.PI / 4, Math.PI / 6, Math.PI / 8); // 设置网格模型的旋转角度
+
   scene.add(mesh);
+
+  console.log(mesh.position.length());
+
+  const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
+  scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
 
   // 实例化一个透视投影相机对象
   const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height);
@@ -38,7 +54,7 @@ onMounted(() => {
   // 创建渲染器对象
   const renderer = new THREE.WebGLRenderer();
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
-  webgl.value.appendChild(renderer.domElement);
+  webgl.value!.appendChild(renderer.domElement);
 
   renderer.render(scene, camera); //执行渲染操作
 });

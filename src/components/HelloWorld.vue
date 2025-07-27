@@ -40,13 +40,21 @@ onMounted(() => {
 
   // requestAnimationFrame实现周期性循环执行
   const clock = new THREE.Clock();
+  const rotationSpeed = Math.PI / 180 / 100; //旋转速度,每帧旋转0.01度
   function render() {
     const spt = clock.getDelta() * 1000; //毫秒
     console.log("两帧渲染时间间隔(毫秒)", spt);
     console.log("帧率FPS", 1000 / spt);
     renderer.render(scene, camera); //执行渲染操作
-    mesh.rotateY(0.01); //每次绕y轴旋转0.01弧度
-
+    /**
+     * 为什么需要它？
+     * 直接使用固定值（如0.01弧度）旋转会导致：
+     * 高刷新率屏幕（120Hz）旋转更快
+     * 低刷新率屏幕（30Hz）旋转更慢
+     * 这样无论帧率高低，物体每秒旋转角度保持一致。
+     */
+    // 帧率无关的旋转（推荐写法）
+    mesh.rotateY(rotationSpeed * spt);
     requestAnimationFrame(render); //请求再次执行函数render
   }
   render();

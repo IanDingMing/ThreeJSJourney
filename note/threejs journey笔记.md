@@ -127,3 +127,52 @@ onMounted(() => {
 
 
 
+## P7 Animations
+
+根据今天的 Git 提交记录，以下是您学习 Three.js 动画开发的核心内容总结：
+
+### 1. 帧率FPS计算与基础旋转
+- 使用 `Clock.getDelta()` 计算帧间隔时间
+- 实现旋转立方体的基础动画
+- 掌握帧率计算公式：`FPS = 1000 / 帧间隔(ms)`
+
+```javascript
+const clock = new THREE.Clock();
+function render() {
+  const spt = clock.getDelta() * 1000;
+  console.log("帧间隔:", spt, "FPS:", 1000 / spt);
+  mesh.rotateY(0.01);
+  requestAnimationFrame(render);
+}
+```
+
+### 2. 帧率无关的旋转优化 
+- **解决关键问题**：不同刷新率屏幕的动画速度不一致
+- 实现帧率无关的恒定速度旋转：
+  ```javascript
+  const rotationSpeed = Math.PI / 180 / 100; // 每毫秒旋转0.01度
+  mesh.rotateY(rotationSpeed * spt);
+  ```
+- 理解时间增量(`deltaTime`)在动画中的作用
+
+### 3. 相机环绕与物体运动 
+- 使用三角函数创建圆周运动：
+  ```javascript
+  camera.position.x = Math.cos(elapsedTime);
+  camera.position.y = Math.sin(elapsedTime);
+  ```
+- 实现相机自动看向目标：`camera.lookAt(mesh.position)`
+- 掌握 `Clock.getElapsedTime()` 获取动画运行总时间
+
+### 4. GSAP 补间动画集成 
+- 引入 GSAP 动画库：`npm install gsap`
+- 创建平移动画序列：
+  ```javascript
+  gsap.to(mesh.position, {x: 2, duration: 1, delay: 1});
+  gsap.to(mesh.position, {x: 0, duration: 1, delay: 2});
+  ```
+- 简化渲染循环：只需处理渲染，动画由 GSAP 管理
+- 理解 GSAP 核心参数：duration（持续时间）、delay（延迟）、ease（缓动函数）
+
+> 
+

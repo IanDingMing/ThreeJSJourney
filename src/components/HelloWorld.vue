@@ -42,9 +42,7 @@ onMounted(() => {
   const clock = new THREE.Clock();
   const rotationSpeed = Math.PI / 180 / 100; //旋转速度,每帧旋转0.01度
   function render() {
-    const spt = clock.getDelta() * 1000; //毫秒
-    console.log("两帧渲染时间间隔(毫秒)", spt);
-    console.log("帧率FPS", 1000 / spt);
+    const elapsedTime = clock.getElapsedTime(); //获取从开始到现在的总时间（秒）
     renderer.render(scene, camera); //执行渲染操作
     /**
      * 为什么需要它？
@@ -54,7 +52,17 @@ onMounted(() => {
      * 这样无论帧率高低，物体每秒旋转角度保持一致。
      */
     // 帧率无关的旋转（推荐写法）
-    mesh.rotateY(rotationSpeed * spt);
+    // mesh.rotateY(rotationSpeed * spt);
+
+    // 立方体绕圈
+    // mesh.position.y = Math.sin(elapsedTime);
+    // mesh.position.x = Math.cos(elapsedTime);
+
+    // 相机绕圈观察
+    camera.position.y = Math.sin(elapsedTime);
+    camera.position.x = Math.cos(elapsedTime);
+    camera.lookAt(mesh.position); // 让相机始终看向原点
+
     requestAnimationFrame(render); //请求再次执行函数render
   }
   render();

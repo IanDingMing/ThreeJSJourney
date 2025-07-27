@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, useTemplateRef, onMounted } from "vue";
 import * as THREE from "three";
+import gsap from "gsap";
+
 defineProps<{ msg: string }>();
 const sizes = {
   width: 800,
@@ -39,30 +41,20 @@ onMounted(() => {
   webgl.value!.appendChild(renderer.domElement);
 
   // requestAnimationFrame实现周期性循环执行
-  const clock = new THREE.Clock();
-  const rotationSpeed = Math.PI / 180 / 100; //旋转速度,每帧旋转0.01度
+  gsap.to(mesh.position, {
+    x: 2,
+    duration: 1,
+    delay: 1,
+    ease: "none",
+  });
+  gsap.to(mesh.position, {
+    x: 0,
+    duration: 1,
+    delay: 2,
+    ease: "none",
+  });
   function render() {
-    const elapsedTime = clock.getElapsedTime(); //获取从开始到现在的总时间（秒）
     renderer.render(scene, camera); //执行渲染操作
-    /**
-     * 为什么需要它？
-     * 直接使用固定值（如0.01弧度）旋转会导致：
-     * 高刷新率屏幕（120Hz）旋转更快
-     * 低刷新率屏幕（30Hz）旋转更慢
-     * 这样无论帧率高低，物体每秒旋转角度保持一致。
-     */
-    // 帧率无关的旋转（推荐写法）
-    // mesh.rotateY(rotationSpeed * spt);
-
-    // 立方体绕圈
-    // mesh.position.y = Math.sin(elapsedTime);
-    // mesh.position.x = Math.cos(elapsedTime);
-
-    // 相机绕圈观察
-    camera.position.y = Math.sin(elapsedTime);
-    camera.position.x = Math.cos(elapsedTime);
-    camera.lookAt(mesh.position); // 让相机始终看向原点
-
     requestAnimationFrame(render); //请求再次执行函数render
   }
   render();

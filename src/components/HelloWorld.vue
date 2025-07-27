@@ -16,30 +16,11 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
 
-  const group = new THREE.Group(); //创建一个组对象
-  group.position.set(0, 1, 0); //设置组对象在x、y、z轴上的位置
-  group.scale.set(1, 1.5, 1); //设置组对象的缩放比例
-  scene.add(group); //将组对象添加到场景中
-
-  const cube1 = new THREE.Mesh(
+  const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(1, 1, 1), //创建一个立方体几何体
     new THREE.MeshBasicMaterial({ color: 0xff0000 }) //创建一个红色材质
   );
-  group.add(cube1); //将立方体添加到组对象中
-
-  const cube2 = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-  );
-  cube2.position.set(1.5, 0, 0); //设置立方体在x、y、z轴上的位置
-  group.add(cube2); //将立方体添加到组对象中
-
-  const cube3 = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshBasicMaterial({ color: 0x0000ff })
-  );
-  cube3.position.set(-1.5, 0, 0); //设置立方体在x、y、z轴上的位置
-  group.add(cube3); //将立方体添加到组对象中
+  scene.add(mesh); //将立方体添加到组对象中
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
@@ -57,7 +38,18 @@ onMounted(() => {
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   webgl.value!.appendChild(renderer.domElement);
 
-  renderer.render(scene, camera); //执行渲染操作
+  // requestAnimationFrame实现周期性循环执行
+  const clock = new THREE.Clock();
+  function render() {
+    const spt = clock.getDelta() * 1000; //毫秒
+    console.log("两帧渲染时间间隔(毫秒)", spt);
+    console.log("帧率FPS", 1000 / spt);
+    renderer.render(scene, camera); //执行渲染操作
+    mesh.rotateY(0.01); //每次绕y轴旋转0.01弧度
+
+    requestAnimationFrame(render); //请求再次执行函数render
+  }
+  render();
 });
 </script>
 

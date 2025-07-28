@@ -28,32 +28,26 @@ onMounted(() => {
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
 
   // 实例化一个透视投影相机对象
-  const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height);
-
-  //相机在Three.js三维坐标系中的位置
-  // 根据需要设置相机位置具体值
-  camera.position.set(0, 0, 3);
-  // camera.lookAt(0, 0, 0); // 让相机向下看向原点
+  // const camera = new THREE.PerspectiveCamera(
+  // 75,
+  // sizes.width / sizes.height,
+  // 1,
+  // 1000
+  // );
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 1000);
+  camera.position.set(2, 2, 2);
+  camera.lookAt(mesh.position); //设置相机观察的目标点
 
   // 创建渲染器对象
   const renderer = new THREE.WebGLRenderer();
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   webgl.value!.appendChild(renderer.domElement);
 
-  // requestAnimationFrame实现周期性循环执行
-  gsap.to(mesh.position, {
-    x: 2,
-    duration: 1,
-    delay: 1,
-    ease: "none",
-  });
-  gsap.to(mesh.position, {
-    x: 0,
-    duration: 1,
-    delay: 2,
-    ease: "none",
-  });
+  const clock = new THREE.Clock(); //创建一个时钟对象，用于计算时间差
   function render() {
+    const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间差
+    mesh.rotation.y = elapsedTime; //让立方体绕y轴旋转
+
     renderer.render(scene, camera); //执行渲染操作
     requestAnimationFrame(render); //请求再次执行函数render
   }

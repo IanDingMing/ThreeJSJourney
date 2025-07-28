@@ -174,5 +174,59 @@ function render() {
 - 简化渲染循环：只需处理渲染，动画由 GSAP 管理
 - 理解 GSAP 核心参数：duration（持续时间）、delay（延迟）、ease（缓动函数）
 
-> 
+## P8 Cameras
 
+### 1. 相机类型对比
+- **透视相机**：模拟人眼视角，近大远小  
+  ```javascript
+  new THREE.PerspectiveCamera(45, width/height, 1, 1000)
+  ```
+- **正交相机**：无透视变形，保持尺寸  
+  ```javascript
+  new THREE.OrthographicCamera(width/-2, width/2, height/2, height/-2, 1, 1000)
+  ```
+
+![20200517225522434](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/20200517225522434.png)
+
+### 2. 轨道控制器(OrbitControls)
+
+- **功能**：实现相机环绕目标运动  
+- **核心配置**：  
+  
+  ```javascript
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; // 启用惯性
+  ```
+- **动画循环要求**：  
+  ```javascript
+  function animate() {
+    controls.update(); // 必须调用
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  ```
+
+### 3. 控制器对比
+| 控制器                  | 交互方式      | 适用场景     |
+| ----------------------- | ------------- | ------------ |
+| **OrbitControls**       | 拖拽旋转/缩放 | 通用3D查看器 |
+| **DragControls**        | 拖拽物体      | 物体编辑     |
+| **TransformControls**   | Gizmo手柄操作 | 3D编辑器     |
+| **PointerLockControls** | 键盘+鼠标锁定 | FPS游戏      |
+| **FlyControls**         | 键盘+鼠标飞行 | 飞行模拟     |
+
+### 4. 为什么正交相机比例不一致会导致物体变形？
+- **原因**：视锥体宽高比 ≠ 画布宽高比  
+
+在计算机图形学中，渲染过程本质上是将3D空间中的物体投影到2D屏幕上的过程。这个投影过程严格遵循数学映射关系，而**相机视锥体宽高比**和**画布宽高比**的关系直接决定了这个映射是否保持物体原始比例。
+
+- #### 核心原理：归一化设备坐标 (NDC) 到屏幕坐标的映射
+
+1. **投影阶段**：
+   - 正交相机将视锥体内的3D点投影到**归一化设备坐标(NDC)**，这是一个[-1,1]×[-1,1]的立方体空间
+   - 无论视锥体实际尺寸如何，所有点都会被线性映射到这个标准立方体
+2. **视口变换阶段**：
+   - 将NDC立方体映射到实际的屏幕像素坐标
+   - 映射规则：`屏幕X = (NDC_X + 1) * 0.5 * canvasWidth`
+   - 映射规则：`屏幕Y = (-NDC_Y + 1) * 0.5 * canvasHeight`（Y轴翻转）

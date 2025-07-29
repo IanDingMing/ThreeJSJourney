@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, useTemplateRef, onMounted } from "vue";
+import { ref, useTemplateRef, onMounted, onUnmounted } from "vue";
 import * as THREE from "three";
 import gsap from "gsap";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -10,36 +10,50 @@ const sizes = {
   height: 600,
 };
 const webgl = useTemplateRef("webgl");
+
+// 1. 声明需要复用的变量
+let camera: THREE.PerspectiveCamera | null = null;
+let renderer: THREE.WebGLRenderer | null = null;
+let controls: OrbitControls | null = null;
+
+// 2. 声明事件处理函数
+const handleResize = () => {
+  if (!webgl.value || !camera || !renderer) return;
+
+  // 更新容器尺寸
+  const container = webgl.value;
+  sizes.width = container.clientWidth;
+  sizes.height = container.clientHeight;
+
+  // 更新相机和渲染器
+  camera.aspect = sizes.width / sizes.height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(sizes.width, sizes.height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // 更新控制器（如果存在）
+  if (controls) controls.update();
+};
+
+const handleDoubleClick = () => {
+  if (!webgl.value) return;
+
+  const fullscreenElement =
+    document.fullscreenElement ||
+    (document as any).webkitFullscreenElement ||
+    (document as any).mozFullScreenElement;
+
+  if (!fullscreenElement) {
+    webgl.value.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+};
+
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
   sizes.height = webgl.value!.clientHeight;
-
-  function handleResize() {
-    if (!webgl.value) return; // 防止 webgl.value 为 null 时报错
-    sizes.width = webgl.value.clientWidth;
-    sizes.height = webgl.value.clientHeight;
-    camera.aspect = sizes.width / sizes.height;
-    camera.updateProjectionMatrix();
-    renderer.setSize(sizes.width, sizes.height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  }
-  function handleDoubleClick() {
-    const fullscreenElement =
-      document.fullscreenElement ||
-      (document as any).webkitFullscreenElement ||
-      (document as any).mozFullScreenElement;
-    // 如果当前不是全屏状态，则请求全屏，否则退出全屏
-    if (!fullscreenElement) {
-      webgl.value!.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  }
-  // 监听浏览器窗口大小变化事件
-  window.addEventListener("resize", handleResize);
-  //监听双击事件全屏
-  window.addEventListener("dblclick", handleDoubleClick);
 
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
@@ -54,25 +68,22 @@ onMounted(() => {
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
 
   // 实例化一个透视投影相机对象
-  const camera = new THREE.PerspectiveCamera(
-    75,
-    sizes.width / sizes.height,
-    1,
-    1000
-  );
+  camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 1, 1000);
   camera.position.set(2, 2, 2);
   camera.lookAt(mesh.position); //设置相机观察的目标点
 
   // 创建渲染器对象
-  const renderer = new THREE.WebGLRenderer();
+  renderer = new THREE.WebGLRenderer();
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   webgl.value!.appendChild(renderer.domElement);
 
-  const controls = new OrbitControls(camera, renderer.domElement);
+  controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true; // 添加惯性效果
 
   const clock = new THREE.Clock(); //创建一个时钟对象，用于计算时间差
   function render() {
+    if (!camera || !renderer || !controls) return;
+
     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间差
     // mesh.rotation.y = elapsedTime; //让立方体绕y轴旋转
 
@@ -82,6 +93,27 @@ onMounted(() => {
     requestAnimationFrame(render); //请求再次执行函数render
   }
   render();
+
+  // 添加事件监听
+  window.addEventListener("resize", handleResize);
+  window.addEventListener("dblclick", handleDoubleClick);
+});
+// 组件卸载时移除事件监听
+onUnmounted(() => {
+  // 移除事件监听
+  window.removeEventListener("resize", handleResize);
+  window.removeEventListener("dblclick", handleDoubleClick);
+
+  // 清理资源
+  if (renderer) {
+    renderer.dispose();
+  }
+  if (controls) {
+    controls.dispose();
+  }
+  camera = null;
+  renderer = null;
+  controls = null;
 });
 </script>
 

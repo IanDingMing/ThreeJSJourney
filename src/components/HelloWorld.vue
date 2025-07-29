@@ -11,10 +11,35 @@ const sizes = {
 };
 const webgl = useTemplateRef("webgl");
 onMounted(() => {
-  // console.log(webgl);
-  // 用 style 设置 div 的宽高
-  webgl.value!.style.width = sizes.width + "px";
-  webgl.value!.style.height = sizes.height + "px";
+  // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
+  sizes.width = webgl.value!.clientWidth;
+  sizes.height = webgl.value!.clientHeight;
+
+  function handleResize() {
+    if (!webgl.value) return; // 防止 webgl.value 为 null 时报错
+    sizes.width = webgl.value.clientWidth;
+    sizes.height = webgl.value.clientHeight;
+    camera.aspect = sizes.width / sizes.height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(sizes.width, sizes.height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  }
+  function handleDoubleClick() {
+    const fullscreenElement =
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement;
+    // 如果当前不是全屏状态，则请求全屏，否则退出全屏
+    if (!fullscreenElement) {
+      webgl.value!.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+  // 监听浏览器窗口大小变化事件
+  window.addEventListener("resize", handleResize);
+  //监听双击事件全屏
+  window.addEventListener("dblclick", handleDoubleClick);
 
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
@@ -62,7 +87,13 @@ onMounted(() => {
 
 <template>
   <!-- <h1>{{ msg }}</h1> -->
-  <div ref="webgl"></div>
+  <div ref="webgl" class="webgl"></div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.webgl {
+  width: 100vw;
+  height: 100vh;
+  background-color: #f00; /* 设置背景颜色为黑色 */
+}
+</style>

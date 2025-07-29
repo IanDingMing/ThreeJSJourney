@@ -230,3 +230,110 @@ function render() {
    - 将NDC立方体映射到实际的屏幕像素坐标
    - 映射规则：`屏幕X = (NDC_X + 1) * 0.5 * canvasWidth`
    - 映射规则：`屏幕Y = (-NDC_Y + 1) * 0.5 * canvasHeight`（Y轴翻转）
+
+## P9 Fullscreen and Resizing
+
+### 1. 增加窗口调整全屏功能
+
+#### 实现目标
+- 实现渲染画面随窗口大小自适应
+- 添加双击全屏/退出全屏功能
+- 优化容器初始尺寸获取方式
+
+#### 关键实现步骤
+1. **容器尺寸动态获取**
+   
+   ```typescript
+   sizes.width = webgl.value!.clientWidth;
+   sizes.height = webgl.value!.clientHeight;
+   ```
+   - 替代硬编码的固定尺寸
+   - 使用`clientWidth/clientHeight`获取容器实际尺寸
+   
+2. **窗口大小响应处理**
+   ```typescript
+   function handleResize() {
+     if (!webgl.value) return;
+     // 更新容器尺寸
+     sizes.width = webgl.value.clientWidth;
+     sizes.height = webgl.value.clientHeight;
+     
+     // 更新相机参数
+     camera.aspect = sizes.width / sizes.height;
+     camera.updateProjectionMatrix();
+     
+     // 更新渲染器
+     renderer.setSize(sizes.width, sizes.height);
+     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+   }
+   window.addEventListener("resize", handleResize);
+   ```
+   - 更新相机宽高比和投影矩阵
+   - 重置渲染器尺寸和像素比
+   - 限制最大像素比为2（平衡性能与画质）
+   
+3. **双击全屏功能**
+   ```typescript
+   function handleDoubleClick() {
+     // 浏览器兼容性处理
+     const fullscreenElement = document.fullscreenElement || 
+         (document as any).webkitFullscreenElement || 
+         (document as any).mozFullScreenElement;
+     
+     if (!fullscreenElement) {
+       webgl.value!.requestFullscreen(); // 进入全屏
+     } else {
+       document.exitFullscreen(); // 退出全屏
+     }
+   }
+   window.addEventListener("dblclick", handleDoubleClick);
+   ```
+   - 多浏览器前缀兼容处理
+   - 安全检测当前全屏状态
+   - 容器元素执行全屏/退出操作
+   
+4. **容器样式设置**
+   ```css
+   .webgl {
+     width: 100vw;
+     height: 100vh;
+     background-color: #f00;
+   }
+   ```
+
+---
+
+### 2. 内存管理优化
+
+#### 优化目标
+- 防止内存泄漏
+- 避免僵尸事件监听
+- 安全释放Three.js资源
+
+#### 关键优化点
+1. **变量作用域提升**
+   ```typescript
+   let camera: THREE.PerspectiveCamera | null = null;
+   let renderer: THREE.WebGLRenderer | null = null;
+   let controls: OrbitControls | null = null;
+   ```
+   - 关键对象提升到组件作用域
+   - 初始化为`null`并添加类型声明
+
+4. **资源清理机制**
+   ```typescript
+   onUnmounted(() => {
+     window.removeEventListener("resize", handleResize);
+     window.removeEventListener("dblclick", handleDoubleClick);
+     
+     if (renderer) renderer.dispose();
+     if (controls) controls.dispose();
+     
+     camera = null;
+     renderer = null;
+     controls = null;
+   });
+   ```
+   - 移除事件监听器
+   - 显式释放Three.js资源
+   - 清除对象引用

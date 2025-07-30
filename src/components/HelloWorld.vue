@@ -2,7 +2,10 @@
 import { ref, useTemplateRef, onMounted, onUnmounted } from "vue";
 import * as THREE from "three";
 import gsap from "gsap";
+// 导入OrbitControls
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+// 导入lil.gui
+import { GUI } from "three/addons/libs/lil-gui.module.min.js";
 
 defineProps<{ msg: string }>();
 const sizes = {
@@ -15,6 +18,7 @@ const webgl = useTemplateRef("webgl");
 let camera: THREE.PerspectiveCamera | null = null;
 let renderer: THREE.WebGLRenderer | null = null;
 let controls: OrbitControls | null = null;
+let gui: GUI | null = null;
 
 // 2. 声明事件处理函数
 const handleResize = () => {
@@ -58,28 +62,14 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
 
-  // const mesh = new THREE.Mesh(
-  //   new THREE.BoxGeometry(1, 1, 1, 4, 4, 4), //创建一个立方体几何体，长宽高的可分段数都为4
-  //   new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true }) //创建一个红色材质
-  // );
-
-  const geometry = new THREE.BufferGeometry();
-  // 创建一个简单的矩形. 在这里我们左上和右下顶点被复制了两次。
-  // 因为在两个三角面片里，这两个顶点都需要被用到。
-  const vertices = new Float32Array([
-    -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0,
-
-    1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0,
-  ]);
-
-  // itemSize = 3 因为每个顶点都是一个三元组。
-  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xff0000,
-    wireframe: true,
-  }); //创建一个红色材质
-  const mesh = new THREE.Mesh(geometry, material);
-
+  const parentMaterial = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    wireframe: false, // 设置父元素的线框模式
+  });
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1, 4, 4, 4), //创建一个立方体几何体，长宽高的可分段数都为4
+    parentMaterial //使用父元素的材质);
+  );
   scene.add(mesh); //将立方体添加到组对象中
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -115,23 +105,84 @@ onMounted(() => {
   // 添加事件监听
   window.addEventListener("resize", handleResize);
   window.addEventListener("dblclick", handleDoubleClick);
+
+  const eventObj = {
+    Fullscreen: function () {
+      document.body.requestFullscreen();
+    },
+    ExitFullscreen: function () {
+      document.exitFullscreen();
+    },
+    Spin: function () {
+      gsap.to(mesh.rotation, {
+        duration: 1,
+        y: mesh.rotation.y + Math.PI * 2,
+        ease: "power1.inOut",
+      });
+    },
+  };
+
+  // 创建GUI===================
+  gui = new GUI();
+  // 添加按钮
+  gui.add(eventObj, "Fullscreen").name("全屏");
+  gui.add(eventObj, "ExitFullscreen").name("退出全屏");
+  gui.add(eventObj, "Spin").name("旋转一周");
+  // 控制立方体的位置
+  const folder = gui.addFolder("立方体位置");
+  // gui.add(mesh.position, 'x', -5, 5).step(1).name('x轴位置')
+  folder
+    .add(mesh.position, "x")
+    .min(-10)
+    .max(10)
+    .step(1)
+    .name("x轴位置")
+    .onChange(function (value) {
+      console.log("位置", value);
+    });
+  folder
+    .add(mesh.position, "y")
+    .min(-10)
+    .max(10)
+    .step(1)
+    .name("y轴位置")
+    .onFinishChange(function (value) {
+      console.log("结束", value);
+    });
+  folder.add(mesh.position, "z").min(-10).max(10).step(1).name("z轴位置");
+  1;
+  gui.add(parentMaterial, "wireframe").name("父元素线框模式");
+
+  const colorParams = {
+    meshColor: "#00ff00",
+  };
+  gui
+    .addColor(colorParams, "meshColor")
+    .name("立方体颜色")
+    .onChange(function (value) {
+      mesh.material.color.set(value);
+    });
+  // 创建GUI===================
 });
 // 组件卸载时移除事件监听
 onUnmounted(() => {
   // 移除事件监听
   window.removeEventListener("resize", handleResize);
   window.removeEventListener("dblclick", handleDoubleClick);
-
   // 清理资源
   if (renderer) {
     renderer.dispose();
+    renderer = null;
   }
   if (controls) {
     controls.dispose();
+    controls = null;
+  }
+  if (gui) {
+    gui.destroy();
+    gui = null;
   }
   camera = null;
-  renderer = null;
-  controls = null;
 });
 </script>
 
@@ -144,6 +195,6 @@ onUnmounted(() => {
 .webgl {
   width: 100vw;
   height: 100vh;
-  background-color: #f00; /* 设置背景颜色为黑色 */
+  background-color: #f00;
 }
 </style>

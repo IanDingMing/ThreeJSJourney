@@ -337,3 +337,69 @@ function render() {
    - 移除事件监听器
    - 显式释放Three.js资源
    - 清除对象引用
+
+## P10 BufferGeometry
+
+### 1. BufferGeometry 实现
+- 创建自定义几何体替代 BoxGeometry
+- 使用 BufferAttribute 定义顶点数据
+```vue
+const geometry = new THREE.BufferGeometry();
+// 创建一个简单的矩形. 在这里我们左上和右下顶点被复制了两次。
+// 因为在两个三角面片里，这两个顶点都需要被用到。
+const vertices = new Float32Array( [
+	-1.0, -1.0,  1.0,
+	 1.0, -1.0,  1.0,
+	 1.0,  1.0,  1.0,
+
+	 1.0,  1.0,  1.0,
+	-1.0,  1.0,  1.0,
+	-1.0, -1.0,  1.0
+] );
+
+// itemSize = 3 因为每个顶点都是一个三元组。
+geometry.setAttribute( 'position', new THREE.BufferAttribute( vertices, 3 ) );
+const material = new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: true } );
+const mesh = new THREE.Mesh( geometry, material );
+```
+
+## P11 GUI
+
+### 1. GUI 控制面板集成
+
+- 添加 lil-gui 控制库
+```vue
+gui = new GUI();
+// gui按键
+gui.add(eventObj, "Fullscreen").name("全屏");
+gui.add(eventObj, "ExitFullscreen").name("退出全屏");
+gui.add(eventObj, "Spin").name("旋转一周");
+
+// gui文件夹
+const folder = gui.addFolder("立方体位置");
+// 文件夹-gui滑块
+folder.add(mesh.position, "x").min(-10).max(10).step(1).name("x轴位置");
+// 文件夹-gui单选框
+gui.add(parentMaterial, "wireframe").name("父元素线框模式");
+
+//颜料盘
+gui.addColor(colorParams, "meshColor").name("立方体颜色")
+  .onChange(value => mesh.material.color.set(value));
+```
+
+### 2. 添加 GUI 销毁逻辑
+
+gui需要手动销毁，不然会出现多次创建gui实例会出现组件重叠问题
+
+例如，在onMounted生命周期中创建了gui实例，更新代码后，如果没有在onUnmounted中销毁，组件重新加载就会出现重叠问题
+
+但是在单个js文件中不会有问题，因为需要刷新页面更新代码，当然生产环境也不会有这种问题
+
+```vue
+onUnmounted(() => {
+  if (gui) {
+    gui.destroy();
+    gui = null;
+  }
+});
+```

@@ -58,10 +58,28 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
 
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1), //创建一个立方体几何体
-    new THREE.MeshBasicMaterial({ color: 0xff0000 }) //创建一个红色材质
-  );
+  // const mesh = new THREE.Mesh(
+  //   new THREE.BoxGeometry(1, 1, 1, 4, 4, 4), //创建一个立方体几何体，长宽高的可分段数都为4
+  //   new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true }) //创建一个红色材质
+  // );
+
+  const geometry = new THREE.BufferGeometry();
+  // 创建一个简单的矩形. 在这里我们左上和右下顶点被复制了两次。
+  // 因为在两个三角面片里，这两个顶点都需要被用到。
+  const vertices = new Float32Array([
+    -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0,
+
+    1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0,
+  ]);
+
+  // itemSize = 3 因为每个顶点都是一个三元组。
+  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xff0000,
+    wireframe: true,
+  }); //创建一个红色材质
+  const mesh = new THREE.Mesh(geometry, material);
+
   scene.add(mesh); //将立方体添加到组对象中
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象

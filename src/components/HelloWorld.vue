@@ -6,8 +6,64 @@ import gsap from "gsap";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 // 导入lil.gui
 import { GUI } from "three/addons/libs/lil-gui.module.min.js";
+import { color } from "three/tsl";
 
-defineProps<{ msg: string }>();
+// 1.使用image加载纹理
+// const image = new Image();
+// image.src = "/textures/door/color.jpg";
+// image.crossOrigin = "anonymous"; // 解决跨域问题
+// const textures = new THREE.Texture(image);
+// image.onload = () => {
+//   textures.needsUpdate = true; // 确保纹理更新
+//   console.log("Image loaded successfully", image);
+// };
+// 2. 使用TextureLoader加载纹理
+const loadingManager = new THREE.LoadingManager();
+loadingManager.onStart = () => {
+  console.log("Loading started");
+};
+loadingManager.onLoad = () => {
+  console.log("Loading complete");
+};
+loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+  console.log(
+    `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
+  );
+};
+loadingManager.onError = (url) => {
+  console.log(`There was an error loading ${url}`);
+};
+
+const texturesLoader = new THREE.TextureLoader(loadingManager);
+// const colorTextures = texturesLoader.load("/textures/door/color.jpg");
+// const colorTextures = texturesLoader.load(
+//   "/textures/checkerboard-1024x1024.png"
+// );
+// const colorTextures = texturesLoader.load("/textures/checkerboard-8x8.png");
+const colorTextures = texturesLoader.load("/textures/minecraft.png");
+const alphaTextures = texturesLoader.load("/textures/door/alpha.jpg");
+const heightTextures = texturesLoader.load("/textures/door/height.jpg");
+const normalTextures = texturesLoader.load("/textures/door/normal.jpg");
+const ambientOcclusionTextures = texturesLoader.load(
+  "/textures/door/ambientOcclusion.jpg"
+);
+const metalnessTextures = texturesLoader.load("/textures/door/metalness.jpg");
+const roughnessTextures = texturesLoader.load("/textures/door/roughness.jpg");
+// // colorTextures.repeat.x = 2;
+// // colorTextures.repeat.y = 3;
+// // // colorTextures.wrapS = THREE.RepeatWrapping; //U方向
+// // // colorTextures.wrapT = THREE.RepeatWrapping; //V方向
+// // colorTextures.wrapS = THREE.MirroredRepeatWrapping; //U方向
+// // colorTextures.wrapT = THREE.MirroredRepeatWrapping; //V方向
+// // colorTextures.offset.x = 0.5;
+// colorTextures.rotation = Math.PI / 4; // 旋转45度
+// colorTextures.center.x = 0.5;
+// colorTextures.center.y = 0.5;
+
+colorTextures.generateMipmaps = false; // 禁用mipmap生成
+colorTextures.minFilter = THREE.NearestFilter; // 设置纹理的最小过滤器
+colorTextures.magFilter = THREE.NearestFilter; // 设置纹理的放大过滤器
+
 const sizes = {
   width: 800,
   height: 600,
@@ -62,13 +118,14 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
 
-  const parentMaterial = new THREE.MeshBasicMaterial({
-    color: 0x00ff00,
+  const material = new THREE.MeshBasicMaterial({
+    map: colorTextures, //设置父元素的纹理贴图
     wireframe: false, // 设置父元素的线框模式
   });
+  const geometry = new THREE.BoxGeometry(1, 1, 1); //创建一个立方体几何体，长宽高的可分段数都为4
   const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1, 4, 4, 4), //创建一个立方体几何体，长宽高的可分段数都为4
-    parentMaterial //使用父元素的材质);
+    geometry,
+    material //使用父元素的材质);
   );
   scene.add(mesh); //将立方体添加到组对象中
 
@@ -151,7 +208,7 @@ onMounted(() => {
     });
   folder.add(mesh.position, "z").min(-10).max(10).step(1).name("z轴位置");
   1;
-  gui.add(parentMaterial, "wireframe").name("父元素线框模式");
+  gui.add(material, "wireframe").name("父元素线框模式");
 
   const colorParams = {
     meshColor: "#00ff00",
@@ -162,6 +219,7 @@ onMounted(() => {
     .onChange(function (value) {
       mesh.material.color.set(value);
     });
+  gui.add(colorTextures.offset, "x").min(0).max(1).step(0.01).name("纹理偏移X");
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听
@@ -187,7 +245,6 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- <h1>{{ msg }}</h1> -->
   <div ref="webgl" class="webgl"></div>
 </template>
 

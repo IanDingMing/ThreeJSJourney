@@ -403,3 +403,261 @@ onUnmounted(() => {
   }
 });
 ```
+
+## P12 textures
+
+### 1. 纹理资源管理
+- 添加棋盘格纹理（1024x1024和8x8两种分辨率）
+- 添加门的PBR材质贴图（颜色/透明/高度/法线/AO/金属/粗糙）
+
+- 使用image加载纹理
+
+```
+const image = new Image();
+image.src = "/textures/door/color.jpg";
+image.crossOrigin = "anonymous"; // 解决跨域问题
+const textures = new THREE.Texture(image);
+image.onload = () => {
+  textures.needsUpdate = true; // 确保纹理更新
+  console.log("Image loaded successfully", image);
+};
+```
+
+- 使用`TextureLoader`加载纹理资源，添加加载管理器处理加载事件
+
+```
+const loadingManager = new THREE.LoadingManager();
+loadingManager.onStart = () => {
+  console.log("Loading started");
+};
+loadingManager.onLoad = () => {
+  console.log("Loading complete");
+};
+loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+  console.log(
+    `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
+  );
+};
+loadingManager.onError = (url) => {
+  console.log(`There was an error loading ${url}`);
+};
+
+const texturesLoader = new THREE.TextureLoader(loadingManager);
+const colorTextures = texturesLoader.load("/textures/door/color.jpg");
+```
+
+### 2. 纹理参数详解
+- .[repeat](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.repeat) : [Vector2](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Vector2)
+
+  决定纹理在表面的重复次数，两个方向分别表示U和V，如果重复次数在任何方向上设置了超过1的数值， 对应的Wrap需要设置为[THREE.RepeatWrapping](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Textures)或者[THREE.MirroredRepeatWrapping](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Textures)来 达到想要的平铺效果。
+
+```
+colorTextures.repeat.x = 2;
+colorTextures.repeat.y = 3;
+```
+
+没添加RepeatWrapping
+
+![截屏2025-08-05 15.49.11](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 15.49.11.png)
+
+```
+colorTextures.wrapS = THREE.RepeatWrapping; //U方向
+colorTextures.wrapT = THREE.RepeatWrapping; //V方向
+```
+
+添加RepeatWrapping
+
+![截屏2025-08-05 15.49.30](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 15.49.30.png)
+
+```
+colorTextures.wrapS = THREE.MirroredRepeatWrapping; //U方向
+colorTextures.wrapT = THREE.MirroredRepeatWrapping; //V方向
+```
+
+添加MirroredRepeatWrapping
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 15.52.00.png)
+
+- .[offset](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.offset) : [Vector2](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Vector2)
+
+  贴图单次重复中的起始偏移量，分别表示U和V。 一般范围是由`0.0`到`1.0`。
+
+```
+colorTextures.offset.x = 0.5;//相当于左移动一半，如果设置了wrapS属性重复或者镜像，右侧会自动补齐，不然就是拉伸补齐
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 15.55.47.png)
+
+- .[rotation](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.rotation) : number
+
+  纹理将围绕中心点旋转多少度，单位为弧度（rad）。正值为逆时针方向旋转，默认值为**0**。
+
+```
+colorTextures.rotation = Math.PI / 4; // 旋转45度
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 22.42.32.png)
+
+- .[center](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.center) : [Vector2](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Vector2)
+
+  旋转中心点。(0.5, 0.5)对应纹理的正中心。默认值为(0,0)，即左下角。
+
+```
+colorTextures.center.x = 0.5;
+colorTextures.center.y = 0.5;
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 22.42.52.png)
+
+### 3. 纹理参数-纹理过滤机制
+
+- .[magFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.magFilter) : number
+
+  当一个纹素覆盖大于一个像素时，贴图将如何采样。默认值为[THREE.LinearFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Textures)， 它将获取四个最接近的纹素，并在他们之间进行双线性插值。 另一个选项是[THREE.NearestFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Textures)，它将使用最接近的纹素的值。
+  请参阅[texture constants](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Textures)页面来了解详细信息。
+
+- .[minFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.minFilter) : number
+
+  当一个纹素覆盖小于一个像素时，贴图将如何采样。默认值为[THREE.LinearMipmapLinearFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Textures)， 它将使用mipmapping以及三次线性滤镜。
+
+- .[generateMipmaps](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.generateMipmaps) : Boolean
+
+  是否为纹理生成mipmap（如果可用）。默认为true。 如果你手动生成mipmap，请将其设为false。
+
+#### 1. **magFilter（放大过滤器）**
+- **原理**：当纹理被放大时（一个纹素覆盖多个屏幕像素），决定如何插值采样
+- **默认值**：`THREE.LinearFilter`
+
+- **常见取值**：
+  - `THREE.NearestFilter`：最近邻采样（Nearest Neighbor Sampling）（可能像素化）直接取**最接近的单个纹素**值（像素化效果）
+  - `THREE.LinearFilter`：线性采样（双线性采样，Bilinear Sampling）（边缘更平滑）取4个最近纹素进行**双线性插值**（平滑过渡）
+- **注意**：不支持 Mipmap 模式
+
+**视觉影响**：
+```javascript
+// 平滑放大（适合真实感材质）
+texture.magFilter = THREE.LinearFilter;
+
+// 锐利放大（适合像素风/复古游戏）
+texture.magFilter = THREE.NearestFilter;
+```
+- 纹理被放大
+
+  - 默认`THREE.LinearFilter`
+
+  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/checkerboard-8x8.png)
+
+  - `THREE.NearestFilter`
+
+  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/colorTextures.magFilter = THREE.NearestFilter; :: 设置纹理的放大过滤器.png)
+
+#### 2. **minFilter（缩小过滤器）**
+- **原理**：当纹理被缩小时（多个纹素对应一个屏幕像素），决定采样策略
+- **默认值**：`THREE.LinearMipmapLinearFilter`
+
+- **常见取值**：
+
+  - `THREE.NearestFilter`：最近邻采样
+  - `THREE.LinearFilter`：线性采样
+  - 带 Mipmap 的模式（如`THREE.NearestMipmapNearestFilter`、`THREE.LinearMipmapLinearFilter`）
+
+- 纹理被缩小
+
+  - 默认`THREE.LinearMipmapLinearFilter`
+
+  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/checkerboard-1024x1024.png)
+
+  - `THREE.NearestFilter`
+
+  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/colorTextures.minFilter = THREE.NearestFilter; :: 设置纹理的最小过滤器.png)
+
+- **关键选项**：
+
+  | 过滤器类型                   | 特点                                             | 性能消耗 |
+  | ---------------------------- | ------------------------------------------------ | -------- |
+  | `NearestFilter`              | 直接取最近纹素（锯齿明显）                       | ★☆☆☆☆    |
+  | `LinearFilter`               | 4纹素平均（轻微模糊）                            | ★★☆☆☆    |
+  | `NearestMipmapNearestFilter` | 选择最接近mip层级+最近采样                       | ★★★☆☆    |
+  | `LinearMipmapNearestFilter`  | 选择最接近mip层级+线性采样                       | ★★★★☆    |
+  | `NearestMipmapLinearFilter`  | 混合两个mip层级+NearestFilter最近邻采样          | ★★★★★    |
+  | `LinearMipmapLinearFilter`   | 混合两个mip层级+LinearFilter双线性采样（最平滑） | ★★★★★    |
+
+#### 3. **generateMipmaps（Mipmap生成）**
+
+Mipmap 是优化纹理渲染的多级纹理技术，核心是生成一系列不同分辨率的纹理版本（纹理金字塔）。
+
+- **原理**：预生成纹理的缩小版本链（原图→1/2→1/4→...→1x1）
+
+- **默认开启**：`true`
+
+- **工作流程**：
+
+  ```mermaid
+  graph LR
+  A[原始纹理] --> B[1/2尺寸] 
+  B --> C[1/4尺寸]
+  C --> D[...]
+  D --> E[1x1纹理]
+  ```
+
+##### a. 原理
+
+- 预生成多级纹理：从原始尺寸（如 1024×1024）逐级缩小至 1×1 像素，每个层级经滤波处理。
+- 实时选择层级：根据物体与相机距离自动匹配分辨率（近处用高分辨率，远处用低分辨率）。
+- 什么时候用 Mipmap？：仅用于纹理**缩小**场景（对应 `minFilter`），当物体离相机较远、纹理在屏幕上的投影尺寸较小时启用，通过自动选择最合适分辨率的 Mipmap 层级提升效率和画质。
+
+##### b. 作用
+
+- **减少锯齿、闪烁和摩尔纹**
+- 降低显存带宽占用，提升渲染性能
+
+- **关键影响**：
+  - ✅ 开启时：显著改善缩小时的渲染质量
+  - ❌ 关闭时：
+    - 节省33%显存
+    - 必须使用非mipmap过滤器（如`NearestFilter`/`LinearFilter`）
+    - 远处纹理可能出现闪烁/锯齿
+
+#### 4. 采样方法选择原则
+
+```javascript
+// 方案1：默认高质量（适合通用场景）
+texture.generateMipmaps = true;
+texture.minFilter = THREE.LinearMipmapLinearFilter;
+texture.magFilter = THREE.LinearFilter;
+
+// 方案2：性能优化（适合小纹理UI）
+texture.generateMipmaps = false;
+texture.minFilter = THREE.LinearFilter;
+texture.magFilter = THREE.LinearFilter;
+
+// 方案3：像素风特效（Minecraft风格）
+texture.generateMipmaps = false;
+texture.minFilter = THREE.NearestFilter;  // 缩小保持锐利
+texture.magFilter = THREE.NearestFilter;  // 放大保持锐利
+```
+
+#### 5. `minFilter` 或 `magFilter` 仅在对应缩放场景生效
+
+`minFilter` 和 `magFilter` 分别只对**纹理缩小**和**纹理放大**场景起作用，若当前场景不满足缩放条件，设置自然不会有视觉变化：
+
+- **`minFilter` 无效**：可能纹理尺寸 ≤ 模型表面需要的纹理尺寸（即纹理处于 “被放大” 或 “等比例” 状态），此时 `minFilter` 不参与计算，由 `magFilter` 主导。
+- **`magFilter` 无效**：可能纹理尺寸 ≥ 模型表面需要的纹理尺寸（即纹理处于 “被缩小” 或 “等比例” 状态），此时 `magFilter` 不参与计算，由 `minFilter` 主导。
+- 纹理的**宽度方向处于压缩状态**，**长度方向处于拉伸状态**，因此 `minFilter`（缩小过滤）和 `magFilter`（放大过滤）会**分别在两个方向上独立生效**，不存在单一 “主导”，而是各自作用于对应的缩放方向。
+
+**举例**：
+
+- 若导入的纹理是 1024×1024，而模型表面映射纹理的区域在屏幕上显示为 2048×2048（纹理被放大），此时只有 `magFilter` 的设置会影响效果，`minFilter` 无论设什么都看不出变化。
+- 假设模型表面的实际尺寸为 **宽 100 × 长 200**，纹理尺寸为 **宽 200 × 长 100**：
+  - **宽度方向**：纹理宽 200 → 模型宽 100 → 纹理被**压缩**（缩小到原来的 1/2）。
+    此时，宽度方向的像素采样由 `minFilter` 控制（因为涉及纹理缩小）。
+  - **长度方向**：纹理长 100 → 模型长 200 → 纹理被**拉伸**（放大到原来的 2 倍）。
+    此时，长度方向的像素采样由 `magFilter` 控制（因为涉及纹理放大）。
+
+#### 6. 纹理未开启 Mipmap 却使用了依赖 Mipmap 的 `minFilter` 模式
+
+`minFilter` 的部分取值（如 `NearestMipmapNearestFilter`、`LinearMipmapLinearFilter` 等）依赖 Mipmap 技术，若纹理未生成 Mipmap，Three.js 会**自动降级为基础模式**（如 `NearestFilter` 或 `LinearFilter`），导致设置无效：
+
+- **原因**：Mipmap 需要纹理在加载时生成多级缩放版本，若纹理的 `generateMipmaps` 属性为 `false`（默认值为 `true`，但可能被手动关闭），则无法使用带 Mipmap 的 `minFilter` 模式。
+- **验证**：检查纹理的 `generateMipmaps` 是否为 `true`（开启 Mipmap 生成），且纹理尺寸为 **2 的幂次方**（如 256、512、1024，非 2 的幂次方纹理可能无法生成完整 Mipmap）。
+

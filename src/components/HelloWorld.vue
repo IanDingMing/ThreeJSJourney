@@ -138,7 +138,7 @@ onMounted(() => {
   // material.shininess = 100; //设置材质的光泽度
   // material.specular = new THREE.Color(0xff0000); //设置材质的高光颜色
 
-  // material = new THREE.MeshToonMaterial(); //标准网格材质，受光照影响
+  // material = new THREE.MeshToonMaterial(); //卡通网格材质，受光照影响
   // /**
   //  * 设置卡通着色的渐变贴图。使用此类纹理时，需要将Texture.minFilterTexture.minFilter
   //  * 和Texture.magFilterTexture.magFilter设置为THREE.NearestFilter。默认为空。

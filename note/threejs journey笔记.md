@@ -667,6 +667,283 @@ texture.magFilter = THREE.NearestFilter;  // 放大保持锐利
 
 ## P13 Materials
 
+1. MeshBasicMaterial (基础材质)
+
+
+
+2. MeshNormalMaterial (法线材质)
+
+
+
+
+
+### 材质使用示例代码
+
+```typescript
+// 1. MeshBasicMaterial (基础材质)
+material = new THREE.MeshBasicMaterial({
+  map: doorColorTextures, // 颜色贴图
+  color: new THREE.Color(0xff0000), // 直接设置颜色
+  wireframe: true, // 线框模式
+  side: THREE.DoubleSide, // 双面渲染
+  transparent: true, // 开启透明度
+  opacity: 0.5, // 透明度值
+  alphaMap: doorAlphaTextures // 透明贴图(需配合transparent)
+});
+
+// 2. MeshNormalMaterial (法线材质)
+material = new THREE.MeshNormalMaterial({
+  flatShading: true // 平面着色(棱角分明)
+});
+
+// 3. MeshMatcapMaterial (Matcap材质)
+material = new THREE.MeshMatcapMaterial({
+  matcap: matcapTextures // 预渲染的环境贴图
+});
+
+// 4. MeshDepthMaterial (深度材质)
+material = new THREE.MeshDepthMaterial(); // 常用于雾效/景深
+
+// 5. MeshLambertMaterial (朗伯材质-漫反射)
+material = new THREE.MeshLambertMaterial({
+  color: 0x00ff00 // 适合非金属物体
+});
+
+// 6. MeshPhongMaterial (Phong材质-高光)
+material = new THREE.MeshPhongMaterial({
+  shininess: 100, // 光泽度 (0-100)
+  specular: new THREE.Color(0xff0000) // 高光颜色
+});
+
+// 7. MeshToonMaterial (卡通材质)
+material = new THREE.MeshToonMaterial({
+  gradientMap: gradientTextures // 渐变贴图
+});
+
+// 8. MeshStandardMaterial (PBR标准材质)
+material = new THREE.MeshStandardMaterial({
+  metalness: 0.7, // 金属度 (0-1)
+  roughness: 0.2, // 粗糙度 (0-1)
+  map: doorColorTextures, // 颜色贴图
+  aoMap: doorAmbientOcclusionTextures, // 环境光遮蔽贴图
+  aoMapIntensity: 1, // AO强度
+  displacementMap: doorHeightTextures, // 位移贴图
+  displacementScale: 0.1, // 位移强度
+  metalnessMap: doorMetalnessTextures, // 金属贴图
+  roughnessMap: doorRoughnessTextures, // 粗糙贴图
+  normalMap: doorNormalTextures, // 法线贴图
+  normalScale: new THREE.Vector2(0.5, 0.5), // 法线强度
+  envMap: environmentMapTexture // 环境反射贴图
+});
+```
+
+### 1. Material 父类
+所有材质均继承自 `THREE.Material`，提供以下通用属性：
+- **透明度控制**：`transparent`（是否透明）、`opacity`（透明度值）
+
+  - .[opacity](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/Material.opacity) : Float
+
+    在0.0 - 1.0的范围内的浮点数，表明材质的透明度。值**0.0**表示完全透明，**1.0**表示完全不透明。
+    如果材质的transparent属性未设置为**true**，则材质将保持完全不透明，此值仅影响其颜色。 默认值为**1.0**。
+
+  - .[transparent](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/Material.transparent) : Boolean
+
+    定义此材质是否透明。这对渲染有影响，因为透明对象需要特殊处理，并在非透明对象之后渲染。
+    设置为true时，通过设置材质的opacity属性来控制材质透明的程度。
+    默认值为**false**。
+
+
+- **面渲染模式**：`side`（前面/后面/双面渲染）
+
+  - .[side](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/Material.side) : Integer
+
+    定义将要渲染哪一面 - 正面，背面或两者。 默认为[THREE.FrontSide](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Materials)。其他选项有[THREE.BackSide](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Materials) 和 [THREE.DoubleSide](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Materials)。
+
+- **线框模式**：`wireframe`（是否显示为线框）
+
+```
+material = new THREE.MeshBasicMaterial();
+material.color = new THREE.Color(0xff0000);// 直接设置颜色
+material.wireframe = true;// 线框模式
+material.side = THREE.DoubleSide; //两面可见
+material.transparent = true; //开启透明度
+material.opacity = 0.5; //设置透明度,使用时必须开启透明度
+```
+
+- **更新标记**：`needsUpdate`（材质修改后需设置为true）
+
+  - .[needsUpdate](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/Material.needsUpdate) : Boolean
+
+    指定需要重新编译材质。
+
+***当设置这个属性为true，材质会自动更新，每次设置完材质属性，都要用这个来更新材质***
+
+```
+material.needsUpdate = true; //更新材质
+```
+
+### 2. MeshBasicMaterial (基础材质)
+
+- **不受光照影响**
+
+- **关键属性**：`map`（颜色贴图）、`alphaMap`（透明贴图）
+
+  - .[aoMap](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshBasicMaterial.aoMap) : [Texture](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture)
+
+    该纹理的红色通道用作环境遮挡贴图。默认值为null。aoMap需要第二组UV。
+
+  - .[map](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshBasicMaterial.map) : [Texture](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture)
+
+    颜色贴图。可以选择包括一个alpha通道，通常与[.transparent](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/Material.transparent) 或[.alphaTest](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/Material.alphaTest)。默认为null。
+
+
+***map就是贴上一个图，alphaMap相当于设计时产生的另一个配套的图，用来裁剪map中的多余部分***
+
+```vue
+material = new THREE.MeshBasicMaterial();
+material.map = doorColorTextures;// 颜色贴图
+material.alphaMap = doorAlphaTextures; //设置透明贴图,使用时必须开启透明度
+
+const planeGeometry = new THREE.PlaneGeometry(1, 1, 100, 100);
+const plane = new THREE.Mesh(planeGeometry, material);
+plane.geometry.setAttribute(
+  "uv2",
+  new THREE.BufferAttribute(planeGeometry.attributes.uv.array, 2)
+); //设置uv2属性，用于环境光遮蔽贴图
+```
+
+### 3. MeshNormalMaterial (法线材质)
+
+***相当于贴图自带高度属性***
+
+- **不受光照影响**
+- **关键属性**：`flatShading`（平面着色，***即是否更顺滑而不是马赛克***）
+
+```vue
+material = new THREE.MeshNormalMaterial(); //法线网格材质
+material.flatShading = true; //定义材质是否使用平面着色进行渲染。默认值为false。
+```
+
+### 4. MeshMatcapMaterial (Matcap材质)
+
+***matcap网格材质，模拟光照材质，即不需要光照就有真实的材质效果***
+
+- **不受光照影响**
+- **关键属性**：`matcap`（环境光照贴图）
+
+```vue
+material = new THREE.MeshMatcapMaterial(); 
+material.matcap = matcapTextures; //设置matcap贴图
+```
+
+### 5. MeshDepthMaterial (深度材质)
+
+***深度网格材质，最直接的例子模拟雾气***
+
+- **不受光照影响**
+
+```vue
+material = new THREE.MeshDepthMaterial();
+```
+
+### 6. MeshLambertMaterial (朗伯材质)
+
+***一种非光泽表面的材质，没有镜面高光。***
+
+***该材质使用基于非物理的[Lambertian](https://en.wikipedia.org/wiki/Lambertian_reflectance)模型来计算反射率。 这可以很好地模拟一些表面（例如未经处理的木材或石材），但不能模拟具有镜面高光的光泽表面（例如涂漆木材）***
+
+- **受光照影响**
+- **关键属性**：`emissive`（自发光颜色）
+
+```vue
+material = new THREE.MeshLambertMaterial(); //朗伯网格材质，非金属材质，受光照影响
+```
+
+### 7. MeshPhongMaterial (Phong材质)
+
+***一种用于具有镜面高光的光泽表面的材质。***
+
+- **受光照影响**
+
+- **关键属性**：`shininess`（高光强度）、`specular`（高光颜色）
+
+  - .[shininess](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshPhongMaterial.shininess) : Float
+
+    [.specular](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshPhongMaterial.specular)高亮的程度，越高的值越闪亮。默认值为 **30**。
+
+  - .[specular](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshPhongMaterial.specular) : [Color](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Color)
+
+    材质的高光颜色。默认值为**0x111111**（深灰色）的颜色[Color](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Color)。
+
+
+```vue
+material = new THREE.MeshPhongMaterial(); //Phong网格材质，金属材质，受光照影响
+material.shininess = 100; //设置材质的光泽度
+material.specular = new THREE.Color(0xff0000); //设置材质的高光颜色
+```
+
+### 8. MeshToonMaterial (卡通材质)
+- **受光照影响**
+
+- **关键属性**：`gradientMap`（渐变贴图）
+
+  - .[gradientMap](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshToonMaterial.gradientMap) : [Texture](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture)
+
+    卡通着色的渐变贴图。使用此类纹理时，需要将Texture.minFilter[Texture.minFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.minFilter)和Texture.magFilter[Texture.magFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.magFilter)设置为[THREE.NearestFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Textures)。默认为空。
+
+
+```vue
+material = new THREE.MeshToonMaterial(); //卡通网格材质，受光照影响
+material.gradientMap = gradientTextures;
+```
+
+### 9. MeshStandardMaterial (PBR标准材质)
+- **受光照影响**
+
+***这个材质相当于把一套的贴图全部应用，创造出很真实的效果***
+
+```vue
+material = new THREE.MeshStandardMaterial(); //标准网格材质，受光照影响
+material.metalness = 0.5; //设置材质的金属度
+material.roughness = 0.5; //设置材质的粗糙
+material.map = doorColorTextures; //设置颜色贴图
+material.aoMap = doorAmbientOcclusionTextures; //设置环境光遮蔽贴图
+material.aoMapIntensity = 1; //设置环境光遮蔽贴图强度
+material.displacementMap = doorHeightTextures; //设置位移贴图
+material.displacementScale = 0.1; //设置位移贴图缩放
+material.metalnessMap = doorMetalnessTextures; //设置金属贴图
+material.roughnessMap = doorRoughnessTextures; //设置粗糙贴图
+material.normalMap = doorNormalTextures; //设置法线贴图
+material.normalScale.set(0.5, 0.5); //设置法线贴图缩放
+material.transparent = true; //开启透明度
+material.alphaMap = doorAlphaTextures; //设置透明贴图,使用时必须开启透明度
+```
+
+- 位移贴图（Displacement Map）与法线贴图（Normal Map）的区别
+
+  - **位移贴图**：通过**改变模型顶点的几何位置**来模拟凹凸效果。
+
+  - **法线贴图**：通过**修改表面法线方向**欺骗光照计算，模拟凹凸光影效果。
+
+| **特性**       | **位移贴图**                   | **法线贴图**                     |
+| :------------- | :----------------------------- | :------------------------------- |
+| **几何变形**   | ✅ 真实改变模型轮廓（如深裂缝） | ❌ 轮廓不变，仅表面有“绘画感”     |
+| **视角真实性** | ✅ 多角度观察均有立体感         | ❌ 侧面或边缘易穿帮（无真实凹凸） |
+| **深度表现**   | ✅ 可模拟大幅凹凸（如砖墙）     | ❌ 仅适合浅层细节（如细纹）       |
+
+- **envMap (环境特图)**
+
+```
+material = new THREE.MeshStandardMaterial(); //标准网格材质，受光照影响
+material.metalness = 0.7; //设置材质的金属度
+material.roughness = 0.2; //设置材质的粗糙
+material.envMap = environmentMapTexture; //设置环境贴图
+```
+
+
+
+
+
 
 
 # 附录

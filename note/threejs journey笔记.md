@@ -667,18 +667,6 @@ texture.magFilter = THREE.NearestFilter;  // 放大保持锐利
 
 ## P13 Materials
 
-1. MeshBasicMaterial (基础材质)
-
-
-
-2. MeshNormalMaterial (法线材质)
-
-
-
-
-
-### 材质使用示例代码
-
 ```typescript
 // 1. MeshBasicMaterial (基础材质)
 material = new THREE.MeshBasicMaterial({

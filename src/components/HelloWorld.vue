@@ -6,20 +6,25 @@ import gsap from "gsap";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 // 导入lil.gui
 import { GUI } from "three/addons/libs/lil-gui.module.min.js";
-import { color, log } from "three/tsl";
+// 导入字体加载器
+import { FontLoader } from "three/addons/loaders/FontLoader.js";
+// 导入文本几何体
+import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
+// 使用FontLoader加载字体
+const fontLoader = new FontLoader();
 
 // 使用TextureLoader加载纹理
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onStart = () => {
-  console.log("Loading started");
+  // console.log("Loading started");
 };
 loadingManager.onLoad = () => {
-  console.log("Loading complete");
+  // console.log("Loading complete");
 };
 loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-  console.log(
-    `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
-  );
+  // console.log(
+  //   `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
+  // );
 };
 loadingManager.onError = (url) => {
   console.log(`There was an error loading ${url}`);
@@ -71,6 +76,20 @@ let controls: OrbitControls | null = null;
 let gui: GUI | null = null;
 const meshArray: THREE.Mesh[] = [];
 let material: THREE.Material | null = null;
+let font: THREE.Font | null = null;
+let textParameters: any = {
+  font: null, // 使用加载的字体
+  size: 0.5, // 字体大小
+  height: 0.2, // 字体厚度
+  curveSegments: 12, // 曲线段数
+  bevelEnabled: true, // 启用斜角
+  bevelThickness: 0.05, // 斜角厚度
+  bevelSize: 0.02, // 斜角大小
+  bevelOffset: 0, // 斜角偏移
+  bevelSegments: 5, // 斜角段数
+};
+let textMesh: THREE.Mesh | null = null;
+let scene: THREE.Scene | null = null;
 
 // 2. 声明事件处理函数
 const handleResize = () => {
@@ -112,79 +131,62 @@ onMounted(() => {
   sizes.height = webgl.value!.clientHeight;
 
   // 创建3D场景对象Scene
-  const scene = new THREE.Scene();
+  scene = new THREE.Scene();
 
   // 模型mesh==========================
-  // material = new THREE.MeshBasicMaterial();
-  // material.map = doorColorTextures;
-  // // material.color = new THREE.Color(0xff0000);
-  // // material.wireframe = true;
-  // material.side = THREE.DoubleSide; //两面可见
-  // material.transparent = true; //开启透明度
-  // // material.opacity = 0.5; //设置透明度
-  // material.alphaMap = doorAlphaTextures; //设置透明贴图,使用时必须开启透明度
+  material = new THREE.MeshMatcapMaterial();
+  material.matcap = matcapTextures; //设置材质的matcap贴图
+  material.wireframe = false; // 设置材质为线框模式
 
-  // material = new THREE.MeshNormalMaterial(); //法线网格材质
-  // material.flatShading = true; //定义材质是否使用平面着色进行渲染。默认值为false。
+  // 加载字体
+  fontLoader.load(
+    // 资源URL，需在本地添加静态资源（根目录/public/fonts/helvetiker_bold.typeface.json）
+    "fonts/helvetiker_bold.typeface.json",
 
-  // material = new THREE.MeshMatcapMaterial(); //matcap网格材质，模拟光照材质，即不需要光照就有真实的材质效果
-  // material.matcap = matcapTextures; //设置matcap贴图
+    // onLoad回调
+    function (loadedFont) {
+      // do something with the font
+      console.log(loadedFont);
+      font = loadedFont; // 将加载的字体赋值给font变量
+      createText(); // 调用创建文本的函数
+    },
 
-  // material = new THREE.MeshDepthMaterial(); //深度网格材质，最直接的例子模拟雾气
+    // onProgress回调
+    function (xhr) {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
 
-  // material = new THREE.MeshLambertMaterial(); //朗伯网格材质，非金属材质，受光照影响
+    // onError回调
+    function (err) {
+      console.log("An error happened");
+    }
+  );
+  // 创建文本的函数
+  const createText = () => {
+    if (!font || !material || !scene) return;
 
-  // material = new THREE.MeshPhongMaterial(); //Phong网格材质，金属材质，受光照影响
-  // material.shininess = 100; //设置材质的光泽度
-  // material.specular = new THREE.Color(0xff0000); //设置材质的高光颜色
+    // 移除旧文本
+    if (textMesh) {
+      scene.remove(textMesh);
+      textMesh.geometry.dispose(); // 释放旧几何体资源
+    }
 
-  // material = new THREE.MeshToonMaterial(); //卡通网格材质，受光照影响
-  // /**
-  //  * 设置卡通着色的渐变贴图。使用此类纹理时，需要将Texture.minFilterTexture.minFilter
-  //  * 和Texture.magFilterTexture.magFilter设置为THREE.NearestFilter。默认为空。
-  //  */
-  // material.gradientMap = gradientTextures;
+    // 创建新文本
+    textParameters.font = font;
+    const textGeometry = new TextGeometry("Hello Three.js", textParameters);
+    textGeometry.center(); // ✅ 确保文本居中
 
-  // material = new THREE.MeshStandardMaterial(); //标准网格材质，受光照影响
-  // material.metalness = 0.5; //设置材质的金属度
-  // material.roughness = 0.5; //设置材质的粗糙
-  // material.map = doorColorTextures; //设置颜色贴图
-  // material.aoMap = doorAmbientOcclusionTextures; //设置环境光遮蔽贴图
-  // material.aoMapIntensity = 1; //设置环境光遮蔽贴图强度
-  // material.displacementMap = doorHeightTextures; //设置位移贴图
-  // material.displacementScale = 0.1; //设置位移贴图缩放
-  // material.metalnessMap = doorMetalnessTextures; //设置金属贴图
-  // material.roughnessMap = doorRoughnessTextures; //设置粗糙贴图
-  // material.normalMap = doorNormalTextures; //设置法线贴图
-  // material.normalScale.set(0.5, 0.5); //设置法线贴图缩放
-  // material.transparent = true; //开启透明度
-  // material.alphaMap = doorAlphaTextures; //设置透明贴图,使用时必须开启透明度
+    textMesh = new THREE.Mesh(textGeometry, material);
+    scene.add(textMesh);
+  };
 
-  material = new THREE.MeshStandardMaterial(); //标准网格材质，受光照影响
-  material.metalness = 0.7; //设置材质的金属度
-  material.roughness = 0.2; //设置材质的粗糙
-  material.envMap = environmentMapTexture; //设置环境贴图
-
-  const sphereGeometry = new THREE.SphereGeometry(0.5, 64, 64);
-  const sphere = new THREE.Mesh(sphereGeometry, material);
-  sphere.position.x = -1.5;
-  meshArray.push(sphere);
-  scene.add(sphere);
-
-  const planeGeometry = new THREE.PlaneGeometry(1, 1, 100, 100);
-  const plane = new THREE.Mesh(planeGeometry, material);
-  plane.geometry.setAttribute(
-    "uv2",
-    new THREE.BufferAttribute(planeGeometry.attributes.uv.array, 2)
-  ); //设置uv2属性，用于环境光遮蔽贴图
-  meshArray.push(plane);
-  scene.add(plane);
+  const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const cube = new THREE.Mesh(cubeGeometry, material);
+  // scene.add(cube);
 
   const torusGeometry = new THREE.TorusGeometry(0.3, 0.2, 16, 100);
   const torus = new THREE.Mesh(torusGeometry, material);
-  torus.position.x = 1.5;
-  meshArray.push(torus);
-  scene.add(torus);
+  // scene.add(torus);
 
   // 模型mesh==========================
 
@@ -260,6 +262,62 @@ onMounted(() => {
   // 添加按钮
   gui.add(eventObj, "useAlphaMap").name("alphaMap贴图");
   gui.add(eventObj, "flatShading").name("开启平面着色");
+
+  // 文件夹-gui滑块
+  // folder.add(mesh.position, "x").min(-10).max(10).step(1).name("x轴位置");
+  // 文件夹-gui单选框
+  gui.add(material, "wireframe").name("线框模式");
+  gui
+    .add(textParameters, "size")
+    .min(0.1)
+    .max(5)
+    .step(0.1)
+    .name("文本大小")
+    .onChange(createText);
+  gui
+    .add(textParameters, "height")
+    .min(0.1)
+    .max(5)
+    .step(0.1)
+    .name("文本厚度")
+    .onChange(createText);
+  gui
+    .add(textParameters, "curveSegments")
+    .min(1)
+    .max(20)
+    .step(1)
+    .name("曲线段数")
+    .onChange(createText);
+  // 斜角参数
+  gui.add(textParameters, "bevelEnabled").name("启用斜角").onChange(createText);
+  gui
+    .add(textParameters, "bevelThickness")
+    .min(0.01)
+    .max(1)
+    .step(0.01)
+    .name("斜角厚度")
+    .onChange(createText);
+  gui
+    .add(textParameters, "bevelSize")
+    .min(0.01)
+    .max(1)
+    .step(0.01)
+    .name("斜角大小")
+    .onChange(createText);
+  gui
+    .add(textParameters, "bevelOffset")
+    .min(-1)
+    .max(1)
+    .step(0.01)
+    .name("斜角偏移")
+    .onChange(createText);
+  gui
+    .add(textParameters, "bevelSegments")
+    .min(1)
+    .max(10)
+    .step(1)
+    .name("斜角段数")
+    .onChange(createText);
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

@@ -146,14 +146,14 @@ onMounted(() => {
     // onLoad回调
     function (loadedFont) {
       // do something with the font
-      console.log(loadedFont);
+      // console.log(loadedFont);
       font = loadedFont; // 将加载的字体赋值给font变量
       createText(); // 调用创建文本的函数
     },
 
     // onProgress回调
     function (xhr) {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+      // console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
     },
 
     // onError回调
@@ -174,20 +174,39 @@ onMounted(() => {
     // 创建新文本
     textParameters.font = font;
     const textGeometry = new TextGeometry("Hello Three.js", textParameters);
+    // textGeometry.center()文本居中原理：
+    // textGeometry.computeBoundingBox(); // 计算文本几何体的边界框
+    // textGeometry.translate(
+    //   -(textGeometry.boundingBox!.max.x - 0.02) / 2,
+    //   -(textGeometry.boundingBox!.max.y - 0.02) / 2,
+    //   -(textGeometry.boundingBox!.max.z - 0.05) / 2
+    // ); // 将文本几何体居中
+    // console.log("textGeometry.boundingBox", textGeometry.boundingBox);
+    // textGeometry.computeBoundingBox(); // 计算文本几何体的边界框
+    // console.log("textGeometry.boundingBox", textGeometry.boundingBox);
     textGeometry.center(); // ✅ 确保文本居中
 
     textMesh = new THREE.Mesh(textGeometry, material);
     scene.add(textMesh);
   };
 
-  const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-  const cube = new THREE.Mesh(cubeGeometry, material);
-  // scene.add(cube);
+  console.time("createText");
+  const torusGeometry = new THREE.TorusGeometry(0.3, 0.2, 20, 45);
+  for (let index = 0; index < 1000; index++) {
+    const torus = new THREE.Mesh(torusGeometry, material);
+    torus.position.x = (Math.random() - 0.5) * 10;
+    torus.position.y = (Math.random() - 0.5) * 10;
+    torus.position.z = (Math.random() - 0.5) * 10;
 
-  const torusGeometry = new THREE.TorusGeometry(0.3, 0.2, 16, 100);
-  const torus = new THREE.Mesh(torusGeometry, material);
-  // scene.add(torus);
+    torus.rotation.x = Math.random() * Math.PI;
+    torus.rotation.y = Math.random() * Math.PI;
 
+    const scale = Math.random();
+    torus.scale.set(scale, scale, scale);
+
+    scene.add(torus);
+  }
+  console.timeEnd("createText");
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象

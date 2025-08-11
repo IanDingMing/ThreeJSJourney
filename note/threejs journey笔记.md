@@ -343,7 +343,7 @@ function render() {
 ### 1. BufferGeometry 实现
 - 创建自定义几何体替代 BoxGeometry
 - 使用 BufferAttribute 定义顶点数据
-```vue
+```javascript
 const geometry = new THREE.BufferGeometry();
 // 创建一个简单的矩形. 在这里我们左上和右下顶点被复制了两次。
 // 因为在两个三角面片里，这两个顶点都需要被用到。
@@ -372,7 +372,7 @@ const mesh = new THREE.Mesh( geometry, material );
 - [dat-gui-API文档详情](#dat.GUI API)
 
 
-```vue
+```javascript
 gui = new GUI();
 // gui按键
 gui.add(eventObj, "Fullscreen").name("全屏");
@@ -399,7 +399,7 @@ gui需要手动销毁，不然会出现多次创建gui实例会出现组件重�
 
 但是在单个js文件中不会有问题，因为需要刷新页面更新代码，当然生产环境也不会有这种问题
 
-```vue
+```javascript
 onUnmounted(() => {
   if (gui) {
     gui.destroy();
@@ -787,7 +787,7 @@ material.needsUpdate = true; //更新材质
 
 ***map就是贴上一个图，alphaMap相当于设计时产生的另一个配套的图，用来裁剪map中的多余部分***
 
-```vue
+```javascript
 material = new THREE.MeshBasicMaterial();
 material.map = doorColorTextures;// 颜色贴图
 material.alphaMap = doorAlphaTextures; //设置透明贴图,使用时必须开启透明度
@@ -807,7 +807,7 @@ plane.geometry.setAttribute(
 - **不受光照影响**
 - **关键属性**：`flatShading`（平面着色，***即是否更顺滑而不是马赛克***）
 
-```vue
+```javascript
 material = new THREE.MeshNormalMaterial(); //法线网格材质
 material.flatShading = true; //定义材质是否使用平面着色进行渲染。默认值为false。
 ```
@@ -819,7 +819,7 @@ material.flatShading = true; //定义材质是否使用平面着色进行渲染�
 - **不受光照影响**
 - **关键属性**：`matcap`（环境光照贴图）
 
-```vue
+```javascript
 material = new THREE.MeshMatcapMaterial(); 
 material.matcap = matcapTextures; //设置matcap贴图
 ```
@@ -830,7 +830,7 @@ material.matcap = matcapTextures; //设置matcap贴图
 
 - **不受光照影响**
 
-```vue
+```javascript
 material = new THREE.MeshDepthMaterial();
 ```
 
@@ -843,7 +843,7 @@ material = new THREE.MeshDepthMaterial();
 - **受光照影响**
 - **关键属性**：`emissive`（自发光颜色）
 
-```vue
+```javascript
 material = new THREE.MeshLambertMaterial(); //朗伯网格材质，非金属材质，受光照影响
 ```
 
@@ -864,7 +864,7 @@ material = new THREE.MeshLambertMaterial(); //朗伯网格材质，非金属材�
     材质的高光颜色。默认值为**0x111111**（深灰色）的颜色[Color](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Color)。
 
 
-```vue
+```javascript
 material = new THREE.MeshPhongMaterial(); //Phong网格材质，金属材质，受光照影响
 material.shininess = 100; //设置材质的光泽度
 material.specular = new THREE.Color(0xff0000); //设置材质的高光颜色
@@ -880,7 +880,7 @@ material.specular = new THREE.Color(0xff0000); //设置材质的高光颜色
     卡通着色的渐变贴图。使用此类纹理时，需要将Texture.minFilter[Texture.minFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.minFilter)和Texture.magFilter[Texture.magFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.magFilter)设置为[THREE.NearestFilter](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/constants/Textures)。默认为空。
 
 
-```vue
+```javascript
 material = new THREE.MeshToonMaterial(); //卡通网格材质，受光照影响
 material.gradientMap = gradientTextures;
 ```
@@ -890,7 +890,7 @@ material.gradientMap = gradientTextures;
 
 ***这个材质相当于把一套的贴图全部应用，创造出很真实的效果***
 
-```vue
+```javascript
 material = new THREE.MeshStandardMaterial(); //标准网格材质，受光照影响
 material.metalness = 0.5; //设置材质的金属度
 material.roughness = 0.5; //设置材质的粗糙
@@ -921,16 +921,160 @@ material.alphaMap = doorAlphaTextures; //设置透明贴图,使用时必须开�
 
 - **envMap (环境特图)**
 
-```
+```javascript
 material = new THREE.MeshStandardMaterial(); //标准网格材质，受光照影响
 material.metalness = 0.7; //设置材质的金属度
 material.roughness = 0.2; //设置材质的粗糙
 material.envMap = environmentMapTexture; //设置环境贴图
 ```
 
+## P14 Text
 
+### 1. 导入字体
 
+- 加载路径：`public/fonts/helvetiker_bold.typeface.json`(资源URL，需在本地添加静态资源（例如：根目录/public/fonts/helvetiker_bold.typeface.json）)
 
+- a. promise加载: 使用`FontLoader`加载字体文件(`FontLoader`会返回`font`，但是加载字体过程为异步，所以这里的返回值要正常使用需要Promise)
+
+```javascript
+  // 加载字体
+  const font = await new Promise<THREE.Font>((resolve, reject) => {
+    fontLoader.load(
+      "/fonts/helvetiker_bold.typeface.json",
+      resolve,
+      undefined,
+      reject
+    );
+  });
+```
+
+- b. 回调加载：
+
+```javascript
+// 导入字体加载器
+import { FontLoader } from "three/addons/loaders/FontLoader.js";
+
+// 使用FontLoader加载字体
+const fontLoader = new FontLoader();
+
+  // 加载字体
+  const loadedFont = fontLoader.load(
+    // 资源URL，需在本地添加静态资源（根目录/public/fonts/helvetiker_bold.typeface.json）
+    "fonts/helvetiker_bold.typeface.json",
+
+    // onLoad回调
+    function (loadedFont) {
+      // do something with the font
+      console.log(loadedFont);
+      createText(); // 调用创建文本的函数
+    },
+
+    // onProgress回调
+    function (xhr) {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
+
+    // onError回调
+    function (err) {
+      console.log("An error happened");
+    }
+  );
+```
+
+### 2. 创建文本几何体
+- 使用`TextGeometry`创建三维文本
+
+```javascript
+  // 创建文本的函数
+  const createText = (font) => {
+    if (!font) return;
+
+    // 创建新文本
+    const textParameters = {
+      font: font, // 使用加载的字体
+      size: 0.5, // 字体大小
+      height: 0.2, // 字体厚度
+      curveSegments: 12, // 曲线段数
+      bevelEnabled: true, // 启用斜角
+      bevelThickness: 0.05, // 斜角厚度
+      bevelSize: 0.02, // 斜角大小
+      bevelOffset: 0, // 斜角偏移
+      bevelSegments: 5, // 斜角段数
+    };
+    const textGeometry = new TextGeometry("Hello Three.js", textParameters);
+    const material = new THREE.MeshMatcapMaterial();
+    material.matcap = matcapTextures; //设置材质的matcap贴图
+    textGeometry.center(); // ✅ 确保文本居中
+
+    const textMesh = new THREE.Mesh(textGeometry, material);
+    scene.add(textMesh);
+  };
+```
+
+### 3. 字体参数特性
+- **重要特性**：文本几何体创建后参数无法直接更新
+- **更新机制**：必须销毁旧几何体并用新参数重建
+- 更新流程：
+  1. 移除场景中的旧文本网格
+  2. 调用`geometry.dispose()`释放资源
+  3. 使用新参数创建新几何体
+  4. 重新添加到场景
+
+```javascript
+  const createText = () => {
+    if (!font || !material || !scene) return;
+
+    // 移除旧文本
+    if (textMesh) {
+      scene.remove(textMesh);
+      textMesh.geometry.dispose(); // 释放旧几何体资源
+    }
+
+    // 创建新文本
+    textParameters.font = font;
+    const textGeometry = new TextGeometry("Hello Three.js", textParameters);
+    textGeometry.center(); // ✅ 确保文本居中
+
+    textMesh = new THREE.Mesh(textGeometry, material);
+    scene.add(textMesh);
+  };
+```
+
+### 4. `textGeometry.center()`(文本居中)原理
+- 手动居中实现方式（等效代码）：
+
+```javascript
+    textGeometry.center()文本居中原理：
+    textGeometry.computeBoundingBox(); // 计算文本几何体的边界框
+    textGeometry.translate(
+      -(textGeometry.boundingBox!.max.x - 0.02) / 2,// bevelSize 斜角大小
+      -(textGeometry.boundingBox!.max.y - 0.02) / 2,// bevelSize 斜角大小
+      -(textGeometry.boundingBox!.max.z - 0.05) / 2// bevelThickness 斜角厚度
+    ); // 将文本几何体居中
+    console.log("textGeometry.boundingBox", textGeometry.boundingBox);
+    textGeometry.computeBoundingBox(); // 计算文本几何体的边界框
+    console.log("textGeometry.boundingBox", textGeometry.boundingBox);
+```
+
+### 5. 大量几何体性能优化
+- 如果将`const torusGeometry = new THREE.TorusGeometry(0.3, 0.2, 20, 45);`放在for循环内，整个过程耗费200多ms，但是如果放在循环外，耗时20多ms，所以***注意性能优化***
+
+- 创建 `Geometry`（几何体）是**非常耗费性能**的操作，这也是循环内外性能差距巨大的核心原因。`TorusGeometry` 等几何体类的作用是**计算并生成顶点数据**（顶点位置、法线、UV 坐标等），这些数据是渲染 3D 模型的基础。
+
+  ```javascript
+  const torusGeometry = new THREE.TorusGeometry(0.3, 0.2, 20, 45);
+  
+  for (let i = 0; i < 1000; i++) {
+    const mesh = new THREE.Mesh(torusGeometry, material);
+    // 仅设置变换属性（位置/旋转/缩放）
+    mesh.position.set(
+      (Math.random() - 0.5) * 10,
+      (Math.random() - 0.5) * 10,
+      (Math.random() - 0.5) * 10
+    );
+    scene.add(mesh);
+  }
+  ```
 
 
 

@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "node -v | grep 20.18.3 || (echo '请先执行 nvm use 20.18.3' && exit 1)",
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {

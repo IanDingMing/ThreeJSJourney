@@ -10,6 +10,9 @@ import { GUI } from "three/addons/libs/lil-gui.module.min.js";
 import { FontLoader } from "three/addons/loaders/FontLoader.js";
 // 导入文本几何体
 import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
+// 导入自定义的纹理工具函数
+import { getTextureUrl } from "@/utils/texturesUtils";
+
 // 使用FontLoader加载字体
 const fontLoader = new FontLoader();
 
@@ -22,9 +25,9 @@ loadingManager.onLoad = () => {
   // console.log("Loading complete");
 };
 loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-  // console.log(
-  //   `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
-  // );
+  console.log(
+    `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
+  );
 };
 loadingManager.onError = (url) => {
   console.log(`There was an error loading ${url}`);
@@ -33,34 +36,38 @@ loadingManager.onError = (url) => {
 const texturesLoader = new THREE.TextureLoader(loadingManager);
 const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
 // 加载纹理
-const doorColorTextures = texturesLoader.load("/textures/door/color.jpg");
-const doorAlphaTextures = texturesLoader.load("/textures/door/alpha.jpg");
-const doorHeightTextures = texturesLoader.load("/textures/door/height.jpg");
-const doorNormalTextures = texturesLoader.load("/textures/door/normal.jpg");
+const doorColorTextures = texturesLoader.load(getTextureUrl("door/color.jpg"));
+const doorAlphaTextures = texturesLoader.load(getTextureUrl("door/alpha.jpg"));
+const doorHeightTextures = texturesLoader.load(
+  getTextureUrl("door/height.jpg")
+);
+const doorNormalTextures = texturesLoader.load(
+  getTextureUrl("door/normal.jpg")
+);
 const doorAmbientOcclusionTextures = texturesLoader.load(
-  "/textures/door/ambientOcclusion.jpg"
+  getTextureUrl("door/ambientOcclusion.jpg")
 );
 const doorMetalnessTextures = texturesLoader.load(
-  "/textures/door/metalness.jpg"
+  getTextureUrl("door/metalness.jpg")
 );
 const doorRoughnessTextures = texturesLoader.load(
-  "/textures/door/roughness.jpg"
+  getTextureUrl("door/roughness.jpg")
 );
 // 其他纹理加载
-const matcapTextures = texturesLoader.load("/textures/matcaps/1.png");
-const gradientTextures = texturesLoader.load("/textures/gradients/3.jpg");
+const matcapTextures = texturesLoader.load(getTextureUrl("matcaps/1.png"));
+const gradientTextures = texturesLoader.load(getTextureUrl("gradients/3.jpg"));
 gradientTextures.magFilter = THREE.NearestFilter; //设置纹理的缩放过滤器
 gradientTextures.minFilter = THREE.NearestFilter; //设置纹理的缩放过滤器
 gradientTextures.generateMipmaps = false; //设置纹理是否生成mipmap
 
 // 环境贴图
 const environmentMapTexture = cubeTextureLoader.load([
-  "/textures/environmentMaps/0/px.jpg",
-  "/textures/environmentMaps/0/nx.jpg",
-  "/textures/environmentMaps/0/py.jpg",
-  "/textures/environmentMaps/0/ny.jpg",
-  "/textures/environmentMaps/0/pz.jpg",
-  "/textures/environmentMaps/0/nz.jpg",
+  getTextureUrl("environmentMaps/0/px.jpg"),
+  getTextureUrl("environmentMaps/0/nx.jpg"),
+  getTextureUrl("environmentMaps/0/py.jpg"),
+  getTextureUrl("environmentMaps/0/ny.jpg"),
+  getTextureUrl("environmentMaps/0/pz.jpg"),
+  getTextureUrl("environmentMaps/0/nz.jpg"),
 ]);
 
 const sizes = {
@@ -141,7 +148,9 @@ onMounted(() => {
   // 加载字体
   fontLoader.load(
     // 资源URL，需在本地添加静态资源（根目录/public/fonts/helvetiker_bold.typeface.json）
-    "fonts/helvetiker_bold.typeface.json",
+    // "fonts/helvetiker_bold.typeface.json",
+    new URL("../assets/fonts/helvetiker_bold.typeface.json", import.meta.url)
+      .href,
 
     // onLoad回调
     function (loadedFont) {

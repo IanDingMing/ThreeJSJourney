@@ -667,64 +667,6 @@ texture.magFilter = THREE.NearestFilter;  // 放大保持锐利
 
 ## P13 Materials
 
-```typescript
-// 1. MeshBasicMaterial (基础材质)
-material = new THREE.MeshBasicMaterial({
-  map: doorColorTextures, // 颜色贴图
-  color: new THREE.Color(0xff0000), // 直接设置颜色
-  wireframe: true, // 线框模式
-  side: THREE.DoubleSide, // 双面渲染
-  transparent: true, // 开启透明度
-  opacity: 0.5, // 透明度值
-  alphaMap: doorAlphaTextures // 透明贴图(需配合transparent)
-});
-
-// 2. MeshNormalMaterial (法线材质)
-material = new THREE.MeshNormalMaterial({
-  flatShading: true // 平面着色(棱角分明)
-});
-
-// 3. MeshMatcapMaterial (Matcap材质)
-material = new THREE.MeshMatcapMaterial({
-  matcap: matcapTextures // 预渲染的环境贴图
-});
-
-// 4. MeshDepthMaterial (深度材质)
-material = new THREE.MeshDepthMaterial(); // 常用于雾效/景深
-
-// 5. MeshLambertMaterial (朗伯材质-漫反射)
-material = new THREE.MeshLambertMaterial({
-  color: 0x00ff00 // 适合非金属物体
-});
-
-// 6. MeshPhongMaterial (Phong材质-高光)
-material = new THREE.MeshPhongMaterial({
-  shininess: 100, // 光泽度 (0-100)
-  specular: new THREE.Color(0xff0000) // 高光颜色
-});
-
-// 7. MeshToonMaterial (卡通材质)
-material = new THREE.MeshToonMaterial({
-  gradientMap: gradientTextures // 渐变贴图
-});
-
-// 8. MeshStandardMaterial (PBR标准材质)
-material = new THREE.MeshStandardMaterial({
-  metalness: 0.7, // 金属度 (0-1)
-  roughness: 0.2, // 粗糙度 (0-1)
-  map: doorColorTextures, // 颜色贴图
-  aoMap: doorAmbientOcclusionTextures, // 环境光遮蔽贴图
-  aoMapIntensity: 1, // AO强度
-  displacementMap: doorHeightTextures, // 位移贴图
-  displacementScale: 0.1, // 位移强度
-  metalnessMap: doorMetalnessTextures, // 金属贴图
-  roughnessMap: doorRoughnessTextures, // 粗糙贴图
-  normalMap: doorNormalTextures, // 法线贴图
-  normalScale: new THREE.Vector2(0.5, 0.5), // 法线强度
-  envMap: environmentMapTexture // 环境反射贴图
-});
-```
-
 ### 1. Material 父类
 所有材质均继承自 `THREE.Material`，提供以下通用属性：
 - **透明度控制**：`transparent`（是否透明）、`opacity`（透明度值）
@@ -1076,7 +1018,127 @@ const fontLoader = new FontLoader();
   }
   ```
 
+## P16 Light
 
+🔮<u>灯光**非常消耗性能**，所以在项目中尽量少用灯光，使用**烘焙**就是一个很好的解决办法，把光的信息事先**烘焙到纹理中**。</u>
+
+### 1. 环境光 (AmbientLight)
+- 均匀照亮所有物体表面
+- 无方向性，无阴影效果
+- 参数：颜色(`0xffffff`)，光照的强度(`0.5`)默认值为 1。
+```javascript
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); //创建环境光对象
+scene.add(ambientLight); //将环境光添加到场景中
+```
+
+### 2. 平行光 (DirectionalLight)
+- 模拟太阳光，方向性光源
+- 可投射清晰阴影
+- 参数：颜色(`0x00fffc`)，强度(`0.5`)
+- **辅助对象**：`DirectionalLightHelper`
+```javascript
+// 从上方照射的白色平行光，强度为 0.5。
+const directionalLight = new THREE.DirectionalLight(0x00fffc, 0.5); //创建平行光对象
+directionalLight.position.set(1, 0.25, 0); //设置平行光位置
+scene.add(directionalLight); //将平行光添加到场景中
+
+const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight, 0.2);
+directionalLightHelper.visible = true; // 可见性控制
+scene.add(directionalLightHelper);
+```
+
+### 3. 半球光 (HemisphereLight)
+- 模拟天空和地面的环境光照
+- 参数：天空色(`0xff0000`)，地面色(`0x0000ff`)，强度(`0.3`)
+- **辅助对象**：`HemisphereLightHelper`
+```javascript
+// 半球光，参数1：天空颜色 参数2：地面颜色 参数3：光照强度
+const hemisphereLight = new THREE.HemisphereLight(0xff0000, 0x0000ff, 0.3);
+scene.add(hemisphereLight); //添加半球光
+
+const hemisphereLightHelper = new THREE.HemisphereLightHelper(hemisphereLight, 0.1);
+hemisphereLightHelper.visible = true; // 可见性控制
+scene.add(hemisphereLightHelper);
+```
+
+### 4. 点光源 (PointLight)
+- 向所有方向均匀发光
+- 参数：颜色(`0xff9000`)，强度(`0.5`)，距离(`10`)，衰减(`2`)
+- **辅助对象**：`PointLightHelper`
+```javascript
+// 点光源，参数1：光的颜色 参数2：光照强度 参数3：光照距离(范围) 参数4：衰减程度
+const pointLight = new THREE.PointLight(0xff9000, 0.5, 10, 2);
+pointLight.position.set(1, -0.5, 1);
+scene.add(pointLight);
+
+const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.2);
+pointLightHelper.visible = true; // 可见性控制
+scene.add(pointLightHelper);
+```
+
+### 5. 矩形区域光 (RectAreaLight)
+- 平面矩形光源
+- 需额外导入`RectAreaLightHelper`
+- 参数：颜色(`0x4e00ff`)，强度(`2`)，宽度(`1`)，高度(`1`)
+```javascript
+// 矩形区域光，参数1：光的颜色 参数2：光照强度 参数3：光照宽度 参数4：光照高度
+const rectLight = new THREE.RectAreaLight(0x4e00ff, 2, 1, 1);
+rectLight.position.set(-1.5, 0, 1.5);
+rectLight.lookAt(0, 0, 0);
+scene.add(rectLight);
+
+// 导入RectAreaLightHelper
+import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
+const rectLightHelper = new RectAreaLightHelper(rectLight);
+rectLightHelper.visible = true; // 可见性控制
+scene.add(rectLightHelper);
+```
+
+### 6. 聚光灯 (SpotLight)
+- 锥形照射区域
+- 参数：颜色(`0x78fff00`)，强度(`0.5`)，距离(`6`)，角度(`Math.PI*0.1`)，衰减(`0.25`)，半影(`1`)
+- **目标对象**：需单独添加至场景
+- **辅助对象**：`SpotLightHelper`
+```javascript
+// 聚光灯，参数1：光的颜色 参数2：光照强度 参数3：光照距离(范围) 参数4：光照角度(弧度) 参数5：边缘衰减程度 参数6：光照衰减程度
+const spotLight = new THREE.SpotLight(
+  0x78fff00,
+  0.5,
+  6,
+  Math.PI * 0.1,
+  0.25,
+  1
+);
+spotLight.position.set(0, 2, 3);
+// 设置聚光灯的目标位置
+spotLight.target.position.x = -0.75;
+scene.add(spotLight);
+scene.add(spotLight.target); //将目标对象添加到场景中
+
+const spotLightHelper = new THREE.SpotLightHelper(spotLight);
+spotLightHelper.visible = true; // 可见性控制
+scene.add(spotLightHelper);
+```
+
+### 7. **解决关键问题**：辅助对象批量显隐控制
+- 使用统一变量`hideHelpers`管理所有辅助对象可见性
+- 性能优化：灯光计算消耗资源，辅助对象仅在调试时显示
+```javascript
+let hideHelpers = true; // 全局控制开关
+
+// 所有helper创建时统一设置可见性
+directionalLightHelper.visible = hideHelpers;
+hemisphereLightHelper.visible = hideHelpers;
+pointLightHelper.visible = hideHelpers;
+rectLightHelper.visible = hideHelpers;
+spotLightHelper.visible = hideHelpers;
+```
+
+> **性能提示**：实际项目中应减少实时灯光使用，优先考虑光照烘焙技术（将光照信息预渲染到纹理），可显著提升渲染性能。
+
+## P17 Shadows
+
+## P18 Haunted House
 
 # 附录
 

@@ -12,6 +12,8 @@ import { FontLoader } from "three/addons/loaders/FontLoader.js";
 import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
 // 导入自定义的纹理工具函数
 import { getTextureUrl } from "@/utils/texturesUtils";
+// 导入RectAreaLightHelper
+import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
 
 // 使用FontLoader加载字体
 const fontLoader = new FontLoader();
@@ -83,20 +85,6 @@ let controls: OrbitControls | null = null;
 let gui: GUI | null = null;
 const meshArray: THREE.Mesh[] = [];
 let material: THREE.Material | null = null;
-let font: THREE.Font | null = null;
-let textParameters: any = {
-  font: null, // 使用加载的字体
-  size: 0.5, // 字体大小
-  height: 0.2, // 字体厚度
-  curveSegments: 12, // 曲线段数
-  bevelEnabled: true, // 启用斜角
-  bevelThickness: 0.05, // 斜角厚度
-  bevelSize: 0.02, // 斜角大小
-  bevelOffset: 0, // 斜角偏移
-  bevelSegments: 5, // 斜角段数
-};
-let textMesh: THREE.Mesh | null = null;
-let scene: THREE.Scene | null = null;
 
 // 2. 声明事件处理函数
 const handleResize = () => {
@@ -138,84 +126,34 @@ onMounted(() => {
   sizes.height = webgl.value!.clientHeight;
 
   // 创建3D场景对象Scene
-  scene = new THREE.Scene();
+  const scene = new THREE.Scene();
 
   // 模型mesh==========================
-  material = new THREE.MeshMatcapMaterial();
-  material.matcap = matcapTextures; //设置材质的matcap贴图
-  material.wireframe = false; // 设置材质为线框模式
+  material = new THREE.MeshStandardMaterial(); //标准网格材质，受光照影响
+  material.roughness = 0.2; //设置材质的粗糙
 
-  // 加载字体
-  fontLoader.load(
-    // 资源URL，需在本地添加静态资源（根目录/public/fonts/helvetiker_bold.typeface.json）
-    // "fonts/helvetiker_bold.typeface.json",
-    new URL("../assets/fonts/helvetiker_bold.typeface.json", import.meta.url)
-      .href,
+  const sphereGeometry = new THREE.SphereGeometry(0.5, 64, 64);
+  const sphere = new THREE.Mesh(sphereGeometry, material);
+  sphere.position.x = -1.5;
+  meshArray.push(sphere);
+  scene.add(sphere);
 
-    // onLoad回调
-    function (loadedFont) {
-      // do something with the font
-      // console.log(loadedFont);
-      font = loadedFont; // 将加载的字体赋值给font变量
-      createText(); // 调用创建文本的函数
-    },
+  const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const cube = new THREE.Mesh(cubeGeometry, material);
+  meshArray.push(cube);
+  scene.add(cube);
 
-    // onProgress回调
-    function (xhr) {
-      // console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
+  const torusGeometry = new THREE.TorusGeometry(0.3, 0.2, 16, 100);
+  const torus = new THREE.Mesh(torusGeometry, material);
+  torus.position.x = 1.5;
+  meshArray.push(torus);
+  scene.add(torus);
 
-    // onError回调
-    function (err) {
-      console.log("An error happened");
-    }
-  );
-  // 创建文本的函数
-  const createText = () => {
-    if (!font || !material || !scene) return;
-
-    // 移除旧文本
-    if (textMesh) {
-      scene.remove(textMesh);
-      textMesh.geometry.dispose(); // 释放旧几何体资源
-    }
-
-    // 创建新文本
-    textParameters.font = font;
-    const textGeometry = new TextGeometry("Hello Three.js", textParameters);
-    // textGeometry.center()文本居中原理：
-    // textGeometry.computeBoundingBox(); // 计算文本几何体的边界框
-    // textGeometry.translate(
-    //   -(textGeometry.boundingBox!.max.x - 0.02) / 2,
-    //   -(textGeometry.boundingBox!.max.y - 0.02) / 2,
-    //   -(textGeometry.boundingBox!.max.z - 0.05) / 2
-    // ); // 将文本几何体居中
-    // console.log("textGeometry.boundingBox", textGeometry.boundingBox);
-    // textGeometry.computeBoundingBox(); // 计算文本几何体的边界框
-    // console.log("textGeometry.boundingBox", textGeometry.boundingBox);
-    textGeometry.center(); // ✅ 确保文本居中
-
-    textMesh = new THREE.Mesh(textGeometry, material);
-    scene.add(textMesh);
-  };
-
-  console.time("createText");
-  const torusGeometry = new THREE.TorusGeometry(0.3, 0.2, 20, 45);
-  for (let index = 0; index < 1000; index++) {
-    const torus = new THREE.Mesh(torusGeometry, material);
-    torus.position.x = (Math.random() - 0.5) * 10;
-    torus.position.y = (Math.random() - 0.5) * 10;
-    torus.position.z = (Math.random() - 0.5) * 10;
-
-    torus.rotation.x = Math.random() * Math.PI;
-    torus.rotation.y = Math.random() * Math.PI;
-
-    const scale = Math.random();
-    torus.scale.set(scale, scale, scale);
-
-    scene.add(torus);
-  }
-  console.timeEnd("createText");
+  const planeGeometry = new THREE.PlaneGeometry(5, 5, 100, 100);
+  const plane = new THREE.Mesh(planeGeometry, material);
+  plane.rotation.x = -Math.PI * 0.5; //将平面旋转90度
+  plane.position.y = -1;
+  scene.add(plane);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -224,9 +162,63 @@ onMounted(() => {
   // 添加灯光
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); //创建环境光对象
   scene.add(ambientLight); //将环境光添加到场景中
-  const pointLight = new THREE.PointLight(0xffffff, 0.5); //创建点光源对象
-  pointLight.position.set(2, 3, 4); //设置点光源位置
-  scene.add(pointLight); //将点光源添加到场景中
+  // 从上方照射的白色平行光，强度为 0.5。
+  const directionalLight = new THREE.DirectionalLight(0x00fffc, 0.5); //创建平行光对象
+  directionalLight.position.set(1, 0.25, 0); //设置平行光位置
+  scene.add(directionalLight); //将平行光添加到场景中
+  // 半球光，参数1：天空颜色 参数2：地面颜色 参数3：光照强度
+  const hemisphereLight = new THREE.HemisphereLight(0xff0000, 0x0000ff, 0.3);
+  scene.add(hemisphereLight); //添加半球光
+  // 点光源，参数1：光的颜色 参数2：光照强度 参数3：光照距离(范围) 参数4：衰减程度
+  const pointLight = new THREE.PointLight(0xff9000, 0.5, 10, 20);
+  console.log(pointLight);
+
+  pointLight.position.set(1, -0.5, 1);
+  scene.add(pointLight);
+  // 矩形区域光，参数1：光的颜色 参数2：光照强度 参数3：光照宽度 参数4：光照高度
+  const rectLight = new THREE.RectAreaLight(0x4e00ff, 2, 1, 1);
+  rectLight.position.set(-1.5, 0, 1.5);
+  rectLight.lookAt(0, 0, 0);
+  scene.add(rectLight);
+  // 聚光灯，参数1：光的颜色 参数2：光照强度 参数3：光照距离(范围) 参数4：光照角度(弧度) 参数5：边缘衰减程度 参数6：光照衰减程度
+  const spotLight = new THREE.SpotLight(
+    0x78fff00,
+    0.5,
+    6,
+    Math.PI * 0.1,
+    0.25,
+    1
+  );
+  spotLight.position.set(0, 2, 3);
+  // 设置聚光灯的目标位置
+  spotLight.target.position.x = -0.75;
+  scene.add(spotLight);
+  scene.add(spotLight.target); //将目标对象添加到场景中
+
+  // 灯光非常消耗性能，所以在项目中尽量少用灯光，使用烘焙就是一个很好的解决办法，把光的信息事先烘焙到纹理中。
+  // Helper
+  let hideHelpers = true; // 是否隐藏灯光辅助对象
+  const directionalLightHelper = new THREE.DirectionalLightHelper(
+    directionalLight,
+    0.2
+  );
+  directionalLightHelper.visible = hideHelpers; // 设置是否显示平行光辅助对象
+  scene.add(directionalLightHelper);
+  const hemisphereLightHelper = new THREE.HemisphereLightHelper(
+    hemisphereLight,
+    0.1
+  );
+  hemisphereLightHelper.visible = hideHelpers; // 设置是否显示半球光辅助对象
+  scene.add(hemisphereLightHelper);
+  const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.2);
+  pointLightHelper.visible = hideHelpers; // 设置是否显示点光源辅助对象
+  scene.add(pointLightHelper);
+  const rectLightHelper = new RectAreaLightHelper(rectLight);
+  rectLightHelper.visible = hideHelpers; // 设置是否显示矩形区域光辅助对象
+  scene.add(rectLightHelper);
+  const spotLightHelper = new THREE.SpotLightHelper(spotLight);
+  spotLightHelper.visible = hideHelpers;
+  scene.add(spotLightHelper);
 
   // 实例化一个透视投影相机对象
   camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 1, 1000);
@@ -247,8 +239,8 @@ onMounted(() => {
 
     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间差
     meshArray.forEach((mesh) => {
-      // mesh.rotation.x = elapsedTime * 0.1; //设置网格模型的旋转角度
-      // mesh.rotation.y = elapsedTime * 0.15; //设置网格模型的旋转角度
+      mesh.rotation.x = elapsedTime * 0.1; //设置网格模型的旋转角度
+      mesh.rotation.y = elapsedTime * 0.15; //设置网格模型的旋转角度
     });
     controls.update();
 
@@ -283,69 +275,23 @@ onMounted(() => {
       }
       material.needsUpdate = true; //更新材质
     },
+    hideHelpers: function () {
+      hideHelpers = !hideHelpers;
+      directionalLightHelper.visible = hideHelpers;
+      hemisphereLightHelper.visible = hideHelpers;
+      pointLightHelper.visible = hideHelpers;
+      rectLightHelper.visible = hideHelpers;
+      spotLightHelper.visible = hideHelpers;
+    },
   };
 
   // 创建GUI===================
   gui = new GUI();
   // 添加按钮
-  gui.add(eventObj, "useAlphaMap").name("alphaMap贴图");
-  gui.add(eventObj, "flatShading").name("开启平面着色");
-
-  // 文件夹-gui滑块
-  // folder.add(mesh.position, "x").min(-10).max(10).step(1).name("x轴位置");
-  // 文件夹-gui单选框
-  gui.add(material, "wireframe").name("线框模式");
-  gui
-    .add(textParameters, "size")
-    .min(0.1)
-    .max(5)
-    .step(0.1)
-    .name("文本大小")
-    .onChange(createText);
-  gui
-    .add(textParameters, "height")
-    .min(0.1)
-    .max(5)
-    .step(0.1)
-    .name("文本厚度")
-    .onChange(createText);
-  gui
-    .add(textParameters, "curveSegments")
-    .min(1)
-    .max(20)
-    .step(1)
-    .name("曲线段数")
-    .onChange(createText);
-  // 斜角参数
-  gui.add(textParameters, "bevelEnabled").name("启用斜角").onChange(createText);
-  gui
-    .add(textParameters, "bevelThickness")
-    .min(0.01)
-    .max(1)
-    .step(0.01)
-    .name("斜角厚度")
-    .onChange(createText);
-  gui
-    .add(textParameters, "bevelSize")
-    .min(0.01)
-    .max(1)
-    .step(0.01)
-    .name("斜角大小")
-    .onChange(createText);
-  gui
-    .add(textParameters, "bevelOffset")
-    .min(-1)
-    .max(1)
-    .step(0.01)
-    .name("斜角偏移")
-    .onChange(createText);
-  gui
-    .add(textParameters, "bevelSegments")
-    .min(1)
-    .max(10)
-    .step(1)
-    .name("斜角段数")
-    .onChange(createText);
+  gui.add(eventObj, "hideHelpers").name("隐藏灯光辅助对象");
+  gui?.add(pointLight, "intensity", 0, 2, 0.01).name("点光源强度");
+  gui?.add(pointLight, "distance", 0, 20, 0.1).name("点光源距离");
+  gui?.add(pointLight, "decay", 0, 5, 0.01).name("点光源衰减");
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

@@ -30,6 +30,7 @@
 
 - 创建渲染器对象：`const renderer = new THREE.WebGLRenderer();`
 - 设置渲染区域大小：`renderer.setSize(sizes.width, sizes.height);`
+- 重置渲染器尺寸和像素比：` renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));`
 - 将渲染器的 canvas 添加到 div：`webgl.value!.appendChild(renderer.domElement);`
 - 渲染场景：`renderer.render(scene, camera);`
 
@@ -111,6 +112,7 @@ onMounted(() => {
   // 创建渲染器对象
   const renderer = new THREE.WebGLRenderer();
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   webgl.value!.appendChild(renderer.domElement);
 
   renderer.render(scene, camera); //执行渲染操作
@@ -1137,6 +1139,104 @@ spotLightHelper.visible = hideHelpers;
 > **性能提示**：实际项目中应减少实时灯光使用，优先考虑光照烘焙技术（将光照信息预渲染到纹理），可显著提升渲染性能。
 
 ## P17 Shadows
+
+### 1. 三种可以投射阴影的光源
+- **平行光 (DirectionalLight)**: 模拟太阳光，整个场景投射相同方向阴影
+- **聚光灯 (SpotLight)**: 圆锥形光源，产生有方向性的锥形阴影
+- **点光源 (PointLight)**: 全方位光源，向所有方向投射阴影（性能消耗最大）
+
+### 2. 阴影生效的条件
+
+1. 设置产生阴影的模型 `sphere.castShadow = true;`
+2. 设置产生阴影的光源 `directionalLight.castShadow = true;`
+3. 设置接收阴影的模型 `plane.receiveShadow = true`
+4. 渲染器启用阴影 `renderer.shadowMap.enabled = true`
+5. 设置光源阴影渲染范围 `[光源].shadow.camera`
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/正投影可视空间.png)
+
+### 3. 阴影预设类型
+
+- `THREE.BasicShadowMap`: 基础模式（性能好，边缘锯齿）
+- `THREE.PCFShadowMap`: 平滑边缘（中等质量）
+- `THREE.PCFSoftShadowMap`: 高质量柔和阴影（默认推荐）
+
+```javascript
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 推荐：柔和边缘阴影
+```
+### 4. 阴影质量精确控制
+
+**通用参数**
+
+```javascript
+light.shadow.mapSize.width = 1024;  // 提高阴影清晰度（默认512）
+light.shadow.mapSize.height = 1024; // 值越高越清晰，性能消耗越大
+light.shadow.radius = 3;            // 阴影模糊半径（0-10）
+```
+
+**平行光参数**
+
+```javascript
+directionalLight.shadow.camera.near = 1;    // 近裁剪面（避免近处裁剪）
+directionalLight.shadow.camera.far = 100;   // 远裁剪面（覆盖场景范围）
+directionalLight.shadow.camera.left = -50;  // 左边界
+directionalLight.shadow.camera.right = 50;  // 右边界
+directionalLight.shadow.camera.top = 50;    // 上边界
+directionalLight.shadow.camera.bottom = -50;// 下边界
+```
+
+**聚光灯参数**
+
+```javascript
+spotLight.shadow.camera.fov = 45;          // 视野角度（匹配光源角度）
+spotLight.shadow.camera.near = 0.1;        // 近裁剪面
+spotLight.shadow.camera.far = 100;         // 远裁剪面
+```
+
+**点光源参数**
+
+```javascript
+pointLight.shadow.camera.near = 0.1;       // 近距离裁剪
+pointLight.shadow.camera.far = 500;        // 远距离裁剪
+```
+
+### 5. 阴影相机辅助
+```javascript
+// 创建阴影相机辅助对象
+const helper = new THREE.CameraHelper(light.shadow.camera);
+scene.add(helper);
+
+// 控制显示/隐藏
+directionalLightHelper.visible = true;  // 平行光辅助
+spotLightHelper.visible = false;        // 聚光灯辅助
+pointLightHelper.visible = false;       // 点光源辅助
+```
+### 6. GUI辅助调节光源阴影
+
+- `updateProjectionMatrix()` 更新阴影相机
+- `helper.update()` 刷新辅助对象显示
+
+```javascript
+// 初始化GUI
+const gui = new dat.GUI();
+const shadowFolder = gui.addFolder('阴影调节');
+const cam = directionalLight.shadow.camera;
+
+// 绑定参数变化监听
+shadowFolder.add(cam, 'left', -100, 0).onChange(v => {
+  cam.updateProjectionMatrix(); // 必须更新投影矩阵
+  helper.update();             // 更新辅助对象显示
+});
+
+// 添加其他可调参数
+shadowFolder.add(cam, 'right', 0, 100).onChange(/* 相同处理 */);
+shadowFolder.add(cam, 'top', 0, 100).onChange(/* 相同处理 */);
+shadowFolder.add(cam, 'bottom', -100, 0).onChange(/* 相同处理 */);
+shadowFolder.add(cam, 'far', 10, 1000).onChange(/* 相同处理 */);
+
+// 添加光源位置调节
+shadowFolder.add(light.position, 'x', -100, 100).name('光源X轴');
+```
 
 ## P18 Haunted House
 

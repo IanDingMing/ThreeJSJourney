@@ -132,27 +132,17 @@ onMounted(() => {
   material = new THREE.MeshStandardMaterial(); //标准网格材质，受光照影响
   material.roughness = 0.2; //设置材质的粗糙
 
-  const sphereGeometry = new THREE.SphereGeometry(0.5, 64, 64);
+  const sphereGeometry = new THREE.SphereGeometry(0.5, 32, 32);
   const sphere = new THREE.Mesh(sphereGeometry, material);
-  sphere.position.x = -1.5;
+  sphere.castShadow = true; //设置网格模型是否投射阴影
   meshArray.push(sphere);
   scene.add(sphere);
 
-  const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-  const cube = new THREE.Mesh(cubeGeometry, material);
-  meshArray.push(cube);
-  scene.add(cube);
-
-  const torusGeometry = new THREE.TorusGeometry(0.3, 0.2, 16, 100);
-  const torus = new THREE.Mesh(torusGeometry, material);
-  torus.position.x = 1.5;
-  meshArray.push(torus);
-  scene.add(torus);
-
-  const planeGeometry = new THREE.PlaneGeometry(5, 5, 100, 100);
+  const planeGeometry = new THREE.PlaneGeometry(5, 5);
   const plane = new THREE.Mesh(planeGeometry, material);
   plane.rotation.x = -Math.PI * 0.5; //将平面旋转90度
-  plane.position.y = -1;
+  plane.position.y = -0.5;
+  plane.receiveShadow = true; //设置网格模型是否接收阴影
   scene.add(plane);
   // 模型mesh==========================
 
@@ -160,44 +150,58 @@ onMounted(() => {
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
 
   // 添加灯光
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); //创建环境光对象
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); //创建环境光对象
   scene.add(ambientLight); //将环境光添加到场景中
   // 从上方照射的白色平行光，强度为 0.5。
-  const directionalLight = new THREE.DirectionalLight(0x00fffc, 0.5); //创建平行光对象
-  directionalLight.position.set(1, 0.25, 0); //设置平行光位置
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.3); //创建平行光对象
+
+  directionalLight.castShadow = true; //设置平行光是否投射阴影
+  directionalLight.shadow.mapSize.width = 1024; //设置阴影贴图的宽度，默认是512，影响阴影的清晰度
+  directionalLight.shadow.mapSize.height = 1024; //设置阴影贴图的高度，默认是512，影响阴影的清晰度
+  directionalLight.shadow.camera.near = 1; //设置阴影相机的近裁剪面
+  directionalLight.shadow.camera.far = 6; //设置阴影相机的远裁剪面
+  directionalLight.shadow.camera.left = -2; //设置阴影相机的左侧边界
+  directionalLight.shadow.camera.right = 2; //设置阴影相机的右侧边界
+  directionalLight.shadow.camera.top = 2; //设置阴影相机的上侧边界
+  directionalLight.shadow.camera.bottom = -2; //设置阴影相机的下侧边界
+  directionalLight.shadow.radius = 10; //设置阴影模糊半径
+
+  directionalLight.position.set(2, 2, -1); //设置平行光位置
   scene.add(directionalLight); //将平行光添加到场景中
   // 半球光，参数1：天空颜色 参数2：地面颜色 参数3：光照强度
-  const hemisphereLight = new THREE.HemisphereLight(0xff0000, 0x0000ff, 0.3);
+  const hemisphereLight = new THREE.HemisphereLight(0xff0000, 0x0000ff, 0);
   scene.add(hemisphereLight); //添加半球光
   // 点光源，参数1：光的颜色 参数2：光照强度 参数3：光照距离(范围) 参数4：衰减程度
-  const pointLight = new THREE.PointLight(0xff9000, 0.5, 10, 20);
-  console.log(pointLight);
-
-  pointLight.position.set(1, -0.5, 1);
+  const pointLight = new THREE.PointLight(0xffffff, 0.3);
+  pointLight.castShadow = true; //设置点光源是否投射阴影
+  pointLight.shadow.mapSize.width = 1024; //设置阴影贴图的宽度，默认是512，影响阴影的清晰度
+  pointLight.shadow.mapSize.height = 1024; //设置阴影贴图的高度，默认是512，影响阴影的清晰度
+  pointLight.shadow.camera.near = 0.1; //设置阴影相机的近裁剪面
+  pointLight.shadow.camera.far = 5; //设置阴影相机的远
+  pointLight.position.set(-1, 1, 0);
   scene.add(pointLight);
+
   // 矩形区域光，参数1：光的颜色 参数2：光照强度 参数3：光照宽度 参数4：光照高度
-  const rectLight = new THREE.RectAreaLight(0x4e00ff, 2, 1, 1);
+  const rectLight = new THREE.RectAreaLight(0x4e00ff, 0, 1, 1);
   rectLight.position.set(-1.5, 0, 1.5);
   rectLight.lookAt(0, 0, 0);
   scene.add(rectLight);
   // 聚光灯，参数1：光的颜色 参数2：光照强度 参数3：光照距离(范围) 参数4：光照角度(弧度) 参数5：边缘衰减程度 参数6：光照衰减程度
-  const spotLight = new THREE.SpotLight(
-    0x78fff00,
-    0.5,
-    6,
-    Math.PI * 0.1,
-    0.25,
-    1
-  );
-  spotLight.position.set(0, 2, 3);
-  // 设置聚光灯的目标位置
-  spotLight.target.position.x = -0.75;
+  const spotLight = new THREE.SpotLight(0xffffff, 0.3, 10, Math.PI * 0.3);
+
+  spotLight.castShadow = true; //设置聚光灯是否投射阴影
+  spotLight.shadow.mapSize.width = 1024; //设置阴影贴图的宽度，默认是512，影响阴影的清晰度
+  spotLight.shadow.mapSize.height = 1024; //设置阴影贴图的高度，默认是512，影响阴影的清晰度
+  spotLight.shadow.camera.near = 1; //设置阴影相机的近裁剪面
+  spotLight.shadow.camera.far = 6; //设置阴影相机的远裁剪面
+  spotLight.shadow.camera.fov = 30; //设置阴影相机的视野角度
+
+  spotLight.position.set(0, 2, 2);
   scene.add(spotLight);
-  scene.add(spotLight.target); //将目标对象添加到场景中
 
   // 灯光非常消耗性能，所以在项目中尽量少用灯光，使用烘焙就是一个很好的解决办法，把光的信息事先烘焙到纹理中。
   // Helper
-  let hideHelpers = true; // 是否隐藏灯光辅助对象
+  let hideHelpers = false; // 是否隐藏灯光辅助对象
   const directionalLightHelper = new THREE.DirectionalLightHelper(
     directionalLight,
     0.2
@@ -220,6 +224,22 @@ onMounted(() => {
   spotLightHelper.visible = hideHelpers;
   scene.add(spotLightHelper);
 
+  const directionalLightShadowCameraHelper = new THREE.CameraHelper(
+    directionalLight.shadow.camera
+  );
+  directionalLightShadowCameraHelper.visible = true; // 设置是否显示平行光阴影相机辅助对象
+  scene.add(directionalLightShadowCameraHelper);
+  const spotLightShadowCameraHelper = new THREE.CameraHelper(
+    spotLight.shadow.camera
+  );
+  spotLightShadowCameraHelper.visible = false; // 设置是否显示聚光灯阴影相机辅助对象
+  scene.add(spotLightShadowCameraHelper);
+  const pointLightShadowCameraHelper = new THREE.CameraHelper(
+    pointLight.shadow.camera
+  );
+  pointLightShadowCameraHelper.visible = false; // 设置是否显示点光源阴影相机辅助对象
+  scene.add(pointLightShadowCameraHelper);
+
   // 实例化一个透视投影相机对象
   camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 1, 1000);
   camera.position.set(2, 2, 2);
@@ -228,6 +248,9 @@ onMounted(() => {
   // 创建渲染器对象
   renderer = new THREE.WebGLRenderer();
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true; //开启阴影
+  // renderer.shadowMap.type = THREE.PCFSoftShadowMap; //设置阴影类型
   webgl.value!.appendChild(renderer.domElement);
 
   controls = new OrbitControls(camera, renderer.domElement);
@@ -239,8 +262,8 @@ onMounted(() => {
 
     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间差
     meshArray.forEach((mesh) => {
-      mesh.rotation.x = elapsedTime * 0.1; //设置网格模型的旋转角度
-      mesh.rotation.y = elapsedTime * 0.15; //设置网格模型的旋转角度
+      // mesh.rotation.x = elapsedTime * 0.1; //设置网格模型的旋转角度
+      // mesh.rotation.y = elapsedTime * 0.15; //设置网格模型的旋转角度
     });
     controls.update();
 
@@ -288,10 +311,35 @@ onMounted(() => {
   // 创建GUI===================
   gui = new GUI();
   // 添加按钮
-  gui.add(eventObj, "hideHelpers").name("隐藏灯光辅助对象");
-  gui?.add(pointLight, "intensity", 0, 2, 0.01).name("点光源强度");
-  gui?.add(pointLight, "distance", 0, 20, 0.1).name("点光源距离");
-  gui?.add(pointLight, "decay", 0, 5, 0.01).name("点光源衰减");
+  // gui.add(eventObj, "hideHelpers").name("隐藏灯光辅助对象");
+  // gui?.add(pointLight, "intensity", 0, 2, 0.01).name("点光源强度");
+  // gui?.add(pointLight, "distance", 0, 20, 0.1).name("点光源距离");
+  // gui?.add(pointLight, "decay", 0, 5, 0.01).name("点光源衰减");
+  // gui.add(ambientLight, "intensity", 0, 2, 0.001).name("环境光强度");
+  gui.add(directionalLight, "intensity", 0, 2, 0.01).name("平行光强度");
+  gui.add(directionalLight.position, "x", -5, 5, 0.01).name("平行光X位置");
+  gui.add(directionalLight.position, "y", -5, 5, 0.01).name("平行光Y位置");
+  gui.add(directionalLight.position, "z", -5, 5, 0.01).name("平行光Z位置");
+  gui.add(directionalLight, "castShadow").name("平行光投射阴影");
+  gui
+    .add(directionalLight.shadow.mapSize, "width", 0, 1024 * 3, 512)
+    .name("平行光阴影贴图宽度");
+  gui
+    .add(directionalLight.shadow.mapSize, "height", 0, 1024 * 3, 512)
+    .name("平行光阴影贴图高度");
+  // 由于阴影偏移量比较小，所以步长设置为0.0001
+  gui
+    .add(directionalLight.shadow, "bias", -0.01, 0.01, 0.0001)
+    .name("平行光阴影偏移");
+  gui
+    .add(directionalLight.shadow, "radius", 0, 10, 0.1)
+    .name("平行光阴影模糊半径");
+  gui
+    .add(directionalLight.shadow, "normalBias", 0, 1, 0.001)
+    .name("平行光阴影法线偏移");
+  // gui.add(hemisphereLight, "intensity", 0, 2, 0.01).name("半球光强度");
+  // gui.add(rectLight, "intensity", 0, 5, 0.01).name("矩形区域光强度");
+  // gui.add(spotLight, "intensity", 0, 2, 0.01).name("聚光灯强度");
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

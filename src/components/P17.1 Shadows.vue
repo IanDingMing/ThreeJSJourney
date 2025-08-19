@@ -61,12 +61,6 @@ const gradientTextures = texturesLoader.load(getTextureUrl("gradients/3.jpg"));
 gradientTextures.magFilter = THREE.NearestFilter; //设置纹理的缩放过滤器
 gradientTextures.minFilter = THREE.NearestFilter; //设置纹理的缩放过滤器
 gradientTextures.generateMipmaps = false; //设置纹理是否生成mipmap
-const bakedShadowsTextures = texturesLoader.load(
-  getTextureUrl("bakedShadow.jpg")
-);
-const simpleShadowTextures = texturesLoader.load(
-  getTextureUrl("simpleShadow.jpg")
-);
 
 // 环境贴图
 const environmentMapTexture = cubeTextureLoader.load([
@@ -145,27 +139,11 @@ onMounted(() => {
   scene.add(sphere);
 
   const planeGeometry = new THREE.PlaneGeometry(5, 5);
-  const plane = new THREE.Mesh(
-    planeGeometry,
-    // new THREE.MeshBasicMaterial({ map: bakedShadowsTextures })
-    material
-  );
+  const plane = new THREE.Mesh(planeGeometry, material);
   plane.rotation.x = -Math.PI * 0.5; //将平面旋转90度
   plane.position.y = -0.5;
   plane.receiveShadow = true; //设置网格模型是否接收阴影
   scene.add(plane);
-
-  const sphereShadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.5, 1.5),
-    new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      transparent: true,
-      alphaMap: simpleShadowTextures,
-    })
-  );
-  sphereShadow.rotation.x = -Math.PI * 0.5;
-  sphereShadow.position.y = plane.position.y + 0.01;
-  scene.add(sphereShadow);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -249,7 +227,7 @@ onMounted(() => {
   const directionalLightShadowCameraHelper = new THREE.CameraHelper(
     directionalLight.shadow.camera
   );
-  directionalLightShadowCameraHelper.visible = false; // 设置是否显示平行光阴影相机辅助对象
+  directionalLightShadowCameraHelper.visible = true; // 设置是否显示平行光阴影相机辅助对象
   scene.add(directionalLightShadowCameraHelper);
   const spotLightShadowCameraHelper = new THREE.CameraHelper(
     spotLight.shadow.camera
@@ -271,7 +249,7 @@ onMounted(() => {
   renderer = new THREE.WebGLRenderer();
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = false; //开启阴影
+  renderer.shadowMap.enabled = true; //开启阴影
   // renderer.shadowMap.type = THREE.PCFSoftShadowMap; //设置阴影类型
   webgl.value!.appendChild(renderer.domElement);
 
@@ -283,16 +261,10 @@ onMounted(() => {
     if (!camera || !renderer || !controls) return;
 
     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间差
-
-    // 让小球动起来
-    sphere.position.x = Math.sin(elapsedTime) * 1.5; //小球在X轴上移动
-    sphere.position.z = Math.cos(elapsedTime) * 1.5; //小球在Z轴上移动
-    sphere.position.y = Math.abs(Math.cos(elapsedTime) * 3); //小球在Y轴上移动
-
-    sphereShadow.position.x = sphere.position.x; //让小球的投影跟随小球移动
-    sphereShadow.position.z = sphere.position.z;
-    sphereShadow.material.opacity = (1 - sphere.position.y) * 0.3; //根据小球的高度改变投影的透明度
-
+    meshArray.forEach((mesh) => {
+      // mesh.rotation.x = elapsedTime * 0.1; //设置网格模型的旋转角度
+      // mesh.rotation.y = elapsedTime * 0.15; //设置网格模型的旋转角度
+    });
     controls.update();
 
     renderer.render(scene, camera); //执行渲染操作

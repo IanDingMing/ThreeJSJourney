@@ -720,9 +720,9 @@ material.needsUpdate = true; //更新材质
 
 - **关键属性**：`map`（颜色贴图）、`alphaMap`（透明贴图）
 
-  - .[aoMap](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshBasicMaterial.aoMap) : [Texture](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture)
+  - .[alphaMap](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshBasicMaterial.alphaMap) : [Texture](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture)
 
-    该纹理的红色通道用作环境遮挡贴图。默认值为null。aoMap需要第二组UV。
+    alpha贴图是一张灰度纹理，用于控制整个表面的不透明度。（黑色：完全透明；白色：完全不透明）。 默认值为null。
 
   - .[map](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshBasicMaterial.map) : [Texture](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture)
 
@@ -735,13 +735,6 @@ material.needsUpdate = true; //更新材质
 material = new THREE.MeshBasicMaterial();
 material.map = doorColorTextures;// 颜色贴图
 material.alphaMap = doorAlphaTextures; //设置透明贴图,使用时必须开启透明度
-
-const planeGeometry = new THREE.PlaneGeometry(1, 1, 100, 100);
-const plane = new THREE.Mesh(planeGeometry, material);
-plane.geometry.setAttribute(
-  "uv2",
-  new THREE.BufferAttribute(planeGeometry.attributes.uv.array, 2)
-); //设置uv2属性，用于环境光遮蔽贴图
 ```
 
 ### 3. MeshNormalMaterial (法线材质)
@@ -832,6 +825,39 @@ material.gradientMap = gradientTextures;
 ### 9. MeshStandardMaterial (PBR标准材质)
 - **受光照影响**
 
+- **核心贴图类型对比表**
+
+  | 贴图属性            | 通俗作用                                                     | 关键特点                                                     |
+  | ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+  | **alphaMap**        | "透明蒙版"：用黑白贴图**控制物体哪里该消失**（黑透白不透）   | 不改变模型形状，只控制可见性，适合做树叶、栅栏等镂空效果     |
+  | **aoMap**           | "**阴影增强器**"：在模型缝隙处添加自然阴影（如墙角、褶皱处） | 需要第二组UV坐标，强度用aoMapIntensity调节（0-1）            |
+  | **displacementMap** | "真实变形器"：按贴图黑白值**推挤模型表面**（白凸黑凹）       | 实际改变几何形状，能投射真实阴影，性能消耗较大               |
+  | **normalMap**       | "光影欺骗师"：通过RGB色值**模拟表面凹凸的光照效果（不改变实际几何形状）** | 紫色基调贴图，y轴方向可能需根据软件坐标系调整（如Unity导出的要y取反） |
+
+- .[alphaMap](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshStandardMaterial.alphaMap) : [Texture](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture)
+
+  alpha贴图是一张灰度纹理，用于控制整个表面的不透明度。（黑色：完全透明；白色：完全不透明）。 默认值为null。
+
+- .[aoMap](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshStandardMaterial.aoMap) : [Texture](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture)
+
+  该纹理的红色通道用作环境遮挡贴图。默认值为null。aoMap需要第二组UV。
+
+- .[aoMapIntensity](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshStandardMaterial.aoMapIntensity) : Float
+
+  环境遮挡效果的强度。默认值为1。零是不遮挡效果。
+
+- .[displacementMap](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshStandardMaterial.displacementMap) : [Texture](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture)
+
+  位移贴图会影响网格顶点的位置，与仅影响材质的光照和阴影的其他贴图不同，移位的顶点可以投射阴影，阻挡其他对象， 以及充当真实的几何体。位移纹理是指：网格的所有顶点被映射为图像中每个像素的值（白色是最高的），并且被重定位。
+
+- .[displacementScale](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshStandardMaterial.displacementScale) : Float
+
+  位移贴图对网格的影响程度（黑色是无位移，白色是最大位移）。如果没有设置位移贴图，则不会应用此值。默认值为1。
+
+- .[normalMap](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/MeshStandardMaterial.normalMap) : [Texture](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture)
+
+  用于创建法线贴图的纹理。RGB值会影响每个像素片段的曲面法线，并更改颜色照亮的方式。法线贴图不会改变曲面的实际形状，只会改变光照。 
+
 ***这个材质相当于把一套的贴图全部应用，创造出很真实的效果***
 
 ```javascript
@@ -849,6 +875,13 @@ material.normalMap = doorNormalTextures; //设置法线贴图
 material.normalScale.set(0.5, 0.5); //设置法线贴图缩放
 material.transparent = true; //开启透明度
 material.alphaMap = doorAlphaTextures; //设置透明贴图,使用时必须开启透明度
+
+const planeGeometry = new THREE.PlaneGeometry(1, 1, 100, 100);
+const plane = new THREE.Mesh(planeGeometry, material);
+plane.geometry.setAttribute(
+  "uv2",
+  new THREE.BufferAttribute(planeGeometry.attributes.uv.array, 2)
+); //设置uv2属性，用于环境光遮蔽贴图
 ```
 
 - 位移贴图（Displacement Map）与法线贴图（Normal Map）的区别
@@ -1239,6 +1272,50 @@ shadowFolder.add(light.position, 'x', -100, 100).name('光源X轴');
 ```
 
 ## P18 Haunted House
+
+### 1. 雾（Fog）
+
+这个类中的参数定义了线性雾。也就是说，雾的密度是随着距离线性增大的。
+
+```javascript
+  const fog = new THREE.Fog("#262837", 1, 15); //雾化效果
+  scene.fog = fog; //将雾化效果添加到场景中
+```
+
+### 2. 设置场景背景色的两种方式
+
+**`setClearColor`性能比`scene.background`略好**
+
+```javascript
+scene.background = new THREE.Color("#262837"); //设置场景背景颜色
+renderer.setClearColor(new THREE.Color("#262837")); //设置渲染器的背景颜色
+```
+
+1. **典型场景对比**‌
+
+   | ‌**需求**‌                | ‌**推荐方法**‌             | ‌**说明**‌                          |
+   | ----------------------- | ------------------------ | --------------------------------- |
+   | 固定颜色/天空盒         | `scene.background`       | 简单高效，适合静态背景‌            |
+   | 透明画布（叠加DOM元素） | `renderer.setClearColor` | 需启用`alpha: true`并禁用场景背景‌ |
+
+2. 关键区别
+
+   &zwnj;**渲染顺序**&zwnj;  
+   `setClearColor`先执行（底层画布清除），`scene.background`后渲染（覆盖前者）
+
+   &zwnj;**透明度实现**&zwnj;  
+   必须组合使用：
+
+   ```js
+   renderer.setClearColor(0x000000, 0); // 透明清除
+   scene.background = null;            // 禁用场景背景
+   ```
+
+4. 常见误区
+- 仅用setClearColor会被scene.background覆盖
+- 透明度参数只在setClearColor生效
+
+
 
 # 附录
 

@@ -1318,6 +1318,246 @@ renderer.setClearColor(new THREE.Color("#262837")); //设置渲染器的背景�
 
 
 
+## P19 Particles
+
+### PointsMaterial( parameters : Object )
+
+parameters - (可选)用于定义材质外观的对象，具有一个或多个属性。 材质的任何属性都可以从此处传入(包括从[Material](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/Material)继承的任何属性)。
+
+属性color例外，其可以作为十六进制字符串传递，默认情况下为 **0xffffff**（白色），内部调用[Color.set](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Color.set)(color)。
+
+.[size](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/PointsMaterial.size) : **Number**
+
+设置**点的大小**。默认值为1.0。
+Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_SIZE_RANGE](https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/getParameter).
+
+.[sizeAttenuation](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/PointsMaterial.sizeAttenuation) : **Boolean**
+
+指定**点的大小是否因相机深度而衰减**。（仅限透视摄像头。）默认为true。
+
+- **使用集合体创造粒子**
+
+```javascript
+  /**
+   * Particles
+   */
+  // Grometry
+  const particlesGeometry = new THREE.SphereGeometry(1, 32, 32);
+
+  // Material
+  const particlesMaterial = new THREE.PointsMaterial();
+  particlesMaterial.size = 0.02;
+  particlesMaterial.sizeAttenuation = false;
+
+  // Points
+  const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+  scene.add(particles);
+```
+
+- **BufferGeometry的方式创造粒子**
+
+```javascript
+  /**
+   * Particles
+   */
+  // Grometry
+  const particlesGeometry = new THREE.BufferGeometry();
+  const count = 5000;
+
+  const position = new Float32Array(count * 3);
+  for (let index = 0; index < count; index++) {
+    position[index + 0] = (Math.random() - 0.5) * 10;
+    position[index + 1] = (Math.random() - 0.5) * 10;
+    position[index + 2] = (Math.random() - 0.5) * 10;
+  }
+
+  particlesGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(position, 3)
+  );
+
+  // Material
+  const particlesMaterial = new THREE.PointsMaterial();
+  particlesMaterial.size = 0.02;
+  particlesMaterial.sizeAttenuation = false;
+
+  // Points
+  const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+  scene.add(particles);
+```
+
+.[alphaTest](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/Material.alphaTest) : **Float**
+
+设置运行alphaTest时要使用的alpha值。如果不透明度低于此值，则不会渲染材质。默认值为**0**。
+
+.[depthTest](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/Material.depthTest) : **Boolean**
+
+是否在渲染此材质时启用深度测试。默认为 **true**。
+
+.[depthWrite](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/materials/Material.depthWrite) : **Boolean**
+
+渲染此材质是否对深度缓冲区有任何影响。默认为**true**。
+
+该属性控制是否将粒子的深度信息写入深度缓冲区（Z-Buffer）。当设置为`false`时，粒子不会更新深度缓冲区中的深度值，即使它们被渲染到场景中。这常用于透明或半透明物体（如粒子效果），避免因深度测试导致后续渲染的物体被错误遮挡。例如，粒子与其他物体重叠时，关闭深度写入可确保粒子始终可见，但可能牺牲部分前后遮挡关系的准确性
+
+**blending = THREE.AdditiveBlending**‌
+此属性定义粒子的颜色混合模式。`AdditiveBlending`是一种叠加混合方式，将当前粒子的颜色值与背景颜色值相加，产生更明亮的发光效果。适用于火焰、星光等需要增强视觉冲击力的场景。其数学表达式为：`最终颜色 = 源颜色（粒子） + 目标颜色（背景）`。这种混合方式会忽略透明度（Alpha）通道，直接叠加RGB值，可能导致颜色过曝。
+
+```
+  const particlesMaterial = new THREE.PointsMaterial();
+  particlesMaterial.size = 0.5;
+  particlesMaterial.sizeAttenuation = true;
+  particlesMaterial.color = new THREE.Color("#ffff00");
+  particlesMaterial.map = particleTexture;
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/map.png)
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/map-cube.png)
+
+```
+  const particlesMaterial = new THREE.PointsMaterial();
+  particlesMaterial.size = 0.5;
+  particlesMaterial.sizeAttenuation = true;
+  particlesMaterial.color = new THREE.Color("#ffff00");
+  particlesMaterial.transparent = true;//有些透明，有些还是被遮盖
+  particlesMaterial.alphaMap = particleTexture;
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/alphaMap.png)
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/alphaMap-cube.png)
+
+```
+  const particlesMaterial = new THREE.PointsMaterial();
+  particlesMaterial.size = 0.5;
+  particlesMaterial.sizeAttenuation = true;
+  particlesMaterial.color = new THREE.Color("#ffff00");
+  particlesMaterial.transparent = true;
+  particlesMaterial.alphaMap = particleTexture;
+  particlesMaterial.alphaTest = 0.001;//如果不透明度低于此值，则不会渲染材质。默认值为0。这里是把不透明度为0不渲染。边缘还是会有遮挡
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/alphaTest.png)
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/alphaTest-cube.png)
+
+```
+  const particlesMaterial = new THREE.PointsMaterial();
+  particlesMaterial.size = 0.5;
+  particlesMaterial.sizeAttenuation = true;
+  particlesMaterial.color = new THREE.Color("#ffff00");
+  // particlesMaterial.map = particleTexture;
+  particlesMaterial.transparent = true;
+  particlesMaterial.alphaMap = particleTexture;
+  particlesMaterial.alphaTest = 0.001;
+  particlesMaterial.depthTest = false;//关闭深度测试，相当于取消遮挡。但是立方体也无法遮盖粒子
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/depthTest.png)
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/depthTest-cube.png)
+
+
+
+```
+  const particlesMaterial = new THREE.PointsMaterial();
+  particlesMaterial.size = 0.5;
+  particlesMaterial.sizeAttenuation = true;
+  particlesMaterial.color = new THREE.Color("#ff0000");
+  // particlesMaterial.map = particleTexture;
+  particlesMaterial.transparent = true;
+  particlesMaterial.alphaMap = particleTexture;
+  //alpha值修改为默认值0，打开深度测试，关闭深度写入
+  // particlesMaterial.alphaTest = 0.001;
+  // particlesMaterial.depthTest = false;
+  particlesMaterial.depthWrite = false;//关闭深度写入
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/depthWrite-cube.png)
+
+```
+  const particlesMaterial = new THREE.PointsMaterial();
+  particlesMaterial.size = 0.5;
+  particlesMaterial.sizeAttenuation = true;
+  particlesMaterial.color = new THREE.Color("#ff0000");
+  // particlesMaterial.map = particleTexture;
+  particlesMaterial.transparent = true;
+  particlesMaterial.alphaMap = particleTexture;
+  // particlesMaterial.alphaTest = 0.001;
+  // particlesMaterial.depthTest = false;
+  particlesMaterial.depthWrite = false;
+  particlesMaterial.blending = THREE.AdditiveBlending;//使用AdditiveBlending增强粒子光效，如火花或能量场。需注意，过度使用AdditiveBlending可能影响性能，尤其在粒子数量较多时
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/blending-cube.png)
+
+**为粒子添加定点颜色，需要开启 `particlesMaterial.vertexColors = true;`**
+
+```
+  /**
+   * Particles
+   */
+  // Grometry
+  const particlesGeometry = new THREE.BufferGeometry();
+  const count = 500;
+
+  const position = new Float32Array(count * 3);
+  const color = new Float32Array(count * 3);
+  for (let index = 0; index < count; index++) {
+    const i3 = index * 3;
+    position[i3 + 0] = (Math.random() - 0.5) * 10;
+    position[i3 + 1] = (Math.random() - 0.5) * 10;
+    position[i3 + 2] = (Math.random() - 0.5) * 10;
+
+    color[i3 + 0] = Math.random();
+    color[i3 + 1] = Math.random();
+    color[i3 + 2] = Math.random();
+  }
+
+  particlesGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(position, 3)
+  );
+
+  particlesGeometry.setAttribute("color", new THREE.BufferAttribute(color, 3));
+
+  // Material
+  const particlesMaterial = new THREE.PointsMaterial();
+  particlesMaterial.size = 0.5;
+  particlesMaterial.sizeAttenuation = true;
+  // particlesMaterial.color = new THREE.Color("#ff0000");
+  // particlesMaterial.map = particleTexture;
+  particlesMaterial.transparent = true;
+  particlesMaterial.alphaMap = particleTexture;
+  // particlesMaterial.alphaTest = 0.001;
+  // particlesMaterial.depthTest = false;
+  particlesMaterial.depthWrite = false;
+  particlesMaterial.blending = THREE.AdditiveBlending;
+  particlesMaterial.vertexColors = true;
+```
+
+**粒子波浪动画**
+
+- **启用即时更新**`particlesGeometry.attributes.position.needsUpdate = true;`
+
+```
+    // update particles
+    for (let index = 0; index < count; index++) {
+      const i3 = index * 3;
+
+      const x = particlesGeometry.attributes.position.array[i3];
+      particlesGeometry.attributes.position.array[i3 + 1] = Math.sin(
+        elapsedTime + x
+      );
+    }
+    particlesGeometry.attributes.position.needsUpdate = true;
+```
+
+## P19 Galaxy Generator
+
+
+
 # 附录
 
 # dat.GUI API

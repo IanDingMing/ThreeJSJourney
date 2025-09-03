@@ -734,6 +734,7 @@ material.needsUpdate = true; //更新材质
 ```javascript
 material = new THREE.MeshBasicMaterial();
 material.map = doorColorTextures;// 颜色贴图
+material.transparent = true; //开启透明度
 material.alphaMap = doorAlphaTextures; //设置透明贴图,使用时必须开启透明度
 ```
 

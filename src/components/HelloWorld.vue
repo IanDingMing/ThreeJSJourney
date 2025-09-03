@@ -103,52 +103,7 @@ onMounted(() => {
     new THREE.BoxGeometry(5, 5, 5),
     new THREE.MeshBasicMaterial()
   );
-  // scene.add(cube);
-
-  /**
-   * Particles
-   */
-  // Grometry
-  const particlesGeometry = new THREE.BufferGeometry();
-  const count = 500;
-
-  const position = new Float32Array(count * 3);
-  const color = new Float32Array(count * 3);
-  for (let index = 0; index < count; index++) {
-    const i3 = index * 3;
-    position[i3 + 0] = (Math.random() - 0.5) * 10;
-    position[i3 + 1] = (Math.random() - 0.5) * 10;
-    position[i3 + 2] = (Math.random() - 0.5) * 10;
-
-    color[i3 + 0] = Math.random();
-    color[i3 + 1] = Math.random();
-    color[i3 + 2] = Math.random();
-  }
-
-  particlesGeometry.setAttribute(
-    "position",
-    new THREE.BufferAttribute(position, 3)
-  );
-
-  particlesGeometry.setAttribute("color", new THREE.BufferAttribute(color, 3));
-
-  // Material
-  const particlesMaterial = new THREE.PointsMaterial();
-  particlesMaterial.size = 0.5;
-  particlesMaterial.sizeAttenuation = true;
-  // particlesMaterial.color = new THREE.Color("#ff0000");
-  // particlesMaterial.map = particleTexture;
-  particlesMaterial.transparent = true;
-  particlesMaterial.alphaMap = particleTexture;
-  // particlesMaterial.alphaTest = 0.001;
-  // particlesMaterial.depthTest = false;
-  particlesMaterial.depthWrite = false;
-  particlesMaterial.blending = THREE.AdditiveBlending;
-  particlesMaterial.vertexColors = true;
-
-  // Points
-  const particles = new THREE.Points(particlesGeometry, particlesMaterial);
-  scene.add(particles);
+  scene.add(cube);
 
   // 模型mesh==========================
 
@@ -182,16 +137,6 @@ onMounted(() => {
     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间差
 
     // update particles
-    // particles.rotation.y = elapsedTime * 0.2;
-    for (let index = 0; index < count; index++) {
-      const i3 = index * 3;
-
-      const x = particlesGeometry.attributes.position.array[i3];
-      particlesGeometry.attributes.position.array[i3 + 1] = Math.sin(
-        elapsedTime + x
-      );
-    }
-    particlesGeometry.attributes.position.needsUpdate = true;
 
     controls.update();
 

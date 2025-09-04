@@ -1366,9 +1366,10 @@ Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_
 
   const position = new Float32Array(count * 3);
   for (let index = 0; index < count; index++) {
-    position[index + 0] = (Math.random() - 0.5) * 10;
-    position[index + 1] = (Math.random() - 0.5) * 10;
-    position[index + 2] = (Math.random() - 0.5) * 10;
+    const i3 = index * 3;
+    position[i3 + 0] = (Math.random() - 0.5) * 10;
+    position[i3 + 1] = (Math.random() - 0.5) * 10;
+    position[i3 + 2] = (Math.random() - 0.5) * 10;
   }
 
   particlesGeometry.setAttribute(
@@ -1554,7 +1555,277 @@ Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_
     particlesGeometry.attributes.position.needsUpdate = true;
 ```
 
-## P19 Galaxy Generator
+## P20 Galaxy Generator
+
+### 星系对象
+
+```
+  const parameters = {
+    count: 1000, // 粒子数量（性能敏感）
+    size: 0.02, // 粒子基础大小
+    radius: 5, // 星系半径
+    branches: 3, // 旋臂数量
+    spin: 3, // 螺旋扭曲系数（>0顺时针，<0逆时针）
+    randomness: 0.2, //分支偏移量
+    randomnessPower: 3, // 随机强度指数（值越大粒子越集中）
+    color: "#ff6030", // 粒子色值
+  };
+
+```
+
+### 星系构思过程
+
+#### 一条星系分支，即线
+
+```
+      positions[i3 + 0] = Math.random() * radius;
+      positions[i3 + 1] = 0;
+      positions[i3 + 2] = 0;
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy1.png)
+
+#### 星系分支
+
+branch = 3
+
+| 0    | 1     | 2     | 3    | 4     | 5     | 6    | 7     | 8     | Index = count * 3                      |
+| ---- | ----- | ----- | ---- | ----- | ----- | ---- | ----- | ----- | -------------------------------------- |
+| 0    | 1     | 2     | 0    | 1     | 2     | 0    | 1     | 2     | Index % branch                         |
+| 0    | 0.33  | 0.66  | 0    | 0.33  | 0.66  | 0    | 0.33  | 0.66  | Index % branch / branch                |
+| 0度  | 120度 | 240度 | 0度  | 120度 | 240度 | 0度  | 120度 | 240度 | Index % branch / branch * 2π           |
+| 1    | -0.5  | -0.5  | 1    | -0.5  | -0.5  | 1    | -0.5  | -0.5  | Math.cos(Index % branch / branch * 2π) |
+| 0    | 0.86  | -0.86 | 0    | 0.86  | -0.86 | 0    | 0.86  | -0.86 | Math.sin(Index % branch / branch * 2π) |
+
+branch = 2
+
+| 0    | 1     | 2    | 3     | 4    | 5     | 6    | 7     | 8    | Index = count * 3            |
+| ---- | ----- | ---- | ----- | ---- | ----- | ---- | ----- | ---- | ---------------------------- |
+| 0    | 1     | 0    | 1     | 0    | 1     | 0    | 1     | 0    | Index % branch               |
+| 0    | 0.5   | 0    | 0.5   | 0    | 0.5   | 0    | 0.5   | 0    | Index % branch / branch      |
+| 0度  | 180度 | 0度  | 180度 | 0度  | 180度 | 0度  | 180度 | 0度  | Index % branch / branch * 2π |
+
+```
+      positions[i3 + 0] = Math.cos(
+        ((index % parameters.branches) / parameters.branches) * Math.PI * 2
+      );
+      positions[i3 + 1] = 0;
+      positions[i3 + 2] = Math.sin(
+        ((index % parameters.branches) / parameters.branches) * Math.PI * 2
+      );
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy2.png)
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy2-20.png)
+
+**乘上半径，成为线**
+
+```
+      const radius = Math.random() * parameters.radius;
+      const branchAngle =
+        ((index % parameters.branches) / parameters.branches) * Math.PI * 2;
+
+      positions[i3 + 0] = Math.cos(branchAngle) * radius;
+      positions[i3 + 1] = 0;
+      positions[i3 + 2] = Math.sin(branchAngle) * radius;
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy2-2.png)
+
+#### 星系分支螺旋扭曲
+
+spinAngle:距离中心越远，偏移程度越大，也就弯的越厉害
+
+```
+      const radius = Math.random() * parameters.radius;
+      const branchAngle =
+        ((index % parameters.branches) / parameters.branches) * Math.PI * 2;
+      const spinAngle = radius * parameters.spin;
+
+      positions[i3 + 0] = Math.cos(branchAngle + spinAngle) * radius;
+      positions[i3 + 1] = 0;
+      positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius;
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy3.png)
+
+#### 星系分支偏移量
+
+```
+      const randomX = Math.random() * parameters.randomness;
+      const randomY = Math.random() * parameters.randomness;
+      const randomZ = Math.random() * parameters.randomness;
+
+      positions[i3 + 0] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+      positions[i3 + 1] = randomY;
+      positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4.png)
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-2.png)
+
+```
+      const randomX = (Math.random() - 0.5) * parameters.randomness;
+      const randomY = (Math.random() - 0.5) * parameters.randomness;
+      const randomZ = (Math.random() - 0.5) * parameters.randomness;
+
+      positions[i3 + 0] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+      positions[i3 + 1] = randomY;
+      positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-3.png)
+
+但是这个还是不好，增加粒子数量，发现偏移还是不够随机
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-4.png)
+
+
+
+接着改进，距离中心越近，分支偏移越小，距离中心越远，分支偏离越大
+
+`Math.pow(Math.random(), parameters.randomnessPower)`图像表示
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-5.png)
+
+```
+      const randomX =
+        Math.pow(Math.random(), parameters.randomnessPower);
+      const randomY =
+        Math.pow(Math.random(), parameters.randomnessPower);
+      const randomZ =
+        Math.pow(Math.random(), parameters.randomnessPower);
+
+      positions[i3 + 0] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+      positions[i3 + 1] = randomY;
+      positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-6.png)
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-7.png)
+
+增加随机性，同时将点分布在xy面两侧
+
+```
+      const randomX =
+        Math.pow(Math.random(), parameters.randomnessPower) *
+        (Math.random() < 0.5 ? 1 : -1);
+      const randomY =
+        Math.pow(Math.random(), parameters.randomnessPower) *
+        (Math.random() < 0.5 ? 1 : -1);
+      const randomZ =
+        Math.pow(Math.random(), parameters.randomnessPower) *
+        (Math.random() < 0.5 ? 1 : -1);
+
+      positions[i3 + 0] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+      positions[i3 + 1] = randomY;
+      positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-8.png)
+
+增加粒子数量就有效果了
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy5.png)
+
+#### 星系加上颜色
+
+```
+  const generateGalaxy = () => {
+  	...
+
+    /**
+     * Grometry
+     */
+    geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(parameters.count * 3);
+    const color = new Float32Array(parameters.count * 3);
+
+    for (let index = 0; index < parameters.count; index++) {
+      const i3 = index * 3;
+      ...
+
+      /**
+       * color
+       */
+      const mixedColor = colorInside.clone();
+      mixedColor.lerp(colorOutside, radius / parameters.radius);
+
+      color[i3 + 0] = 1;
+      color[i3 + 1] = 0;
+      color[i3 + 2] = 0;
+    }
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(color, 3));
+
+    /**
+     * material
+     */
+    material = new THREE.PointsMaterial({
+      ...
+      // color: '#ff5588', // 直接添加颜色
+      vertexColors: true,
+    });
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy6.png)
+
+**改进，添加混合颜色，`Color.lerp`**
+
+**.[lerp](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Color.lerp) ( color : [Color](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Color), alpha : Float ) : this**
+
+[color](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Color) - 用于收敛的颜色。
+alpha - 介于0到1的数字。
+
+将该颜色的RGB值线性插值到传入参数的RGB值。alpha参数可以被认为是两种颜色之间的比例值，其中0是当前颜色和1.0是第一个参数的颜色。
+
+**但是这个方法会改变color对象数值，所以使用clone方法先保持原本color对象不变，因为alpha是[0-1]，所以需要除以半径**
+
+```
+  const generateGalaxy = () => {
+    ...
+
+    /**
+     * Grometry
+     */
+    geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(parameters.count * 3);
+    const color = new Float32Array(parameters.count * 3);
+    const colorInside = new THREE.Color(parameters.insideColor);
+    const colorOutside = new THREE.Color(parameters.outsideColor);
+    
+    for (let index = 0; index < parameters.count; index++) {
+      const i3 = index * 3;
+      ...
+
+      /**
+       * color
+       */
+      const mixedColor = colorInside
+        .clone()
+        .lerp(colorOutside, radius / parameters.radius);
+
+      color[i3 + 0] = mixedColor.r;
+      color[i3 + 1] = mixedColor.g;
+      color[i3 + 2] = mixedColor.b;
+    }
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(color, 3));
+
+    /**
+     * material
+     */
+    material = new THREE.PointsMaterial({
+      ...
+      // color: '#ff5588', // 直接添加颜色
+      vertexColors: true,
+    });
+```
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy7.png)
 
 
 

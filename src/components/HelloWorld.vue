@@ -99,110 +99,15 @@ onMounted(() => {
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 模型mesh==========================
-  const cube = new THREE.Mesh(
-    new THREE.BoxGeometry(5, 5, 5),
-    new THREE.MeshBasicMaterial()
-  );
-  // scene.add(cube);
-
   /**
-   * Galaxy
+   * Test cube
    */
-  const parameters = {
-    count: 100000, // 粒子数量（性能敏感）
-    size: 0.02, // 粒子基础大小
-    radius: 5, // 星系半径
-    branches: 3, // 旋臂数量
-    spin: 3, // 螺旋扭曲系数（>0顺时针，<0逆时针）
-    randomness: 0.2, //分支偏移量
-    randomnessPower: 3, // 随机强度指数（值越大粒子越集中）
-    insideColor: "#ff6030", // 粒子色值
-    outsideColor: "#1b3984", // 粒子色值
-  };
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial({ color: "#ff0000" })
+  );
+  scene.add(cube);
 
-  let geometry: THREE.BufferGeometry | null = null;
-  let material: THREE.PointsMaterial | null = null;
-  let points: THREE.Points | null = null;
-
-  const generateGalaxy = () => {
-    /**
-     * Destroy old galaxy
-     */
-    if (points !== null) {
-      geometry?.dispose();
-      material?.dispose();
-      scene.remove(points);
-    }
-
-    /**
-     * Grometry
-     */
-    geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(parameters.count * 3);
-    const color = new Float32Array(parameters.count * 3);
-    const colorInside = new THREE.Color(parameters.insideColor);
-    const colorOutside = new THREE.Color(parameters.outsideColor);
-
-    for (let index = 0; index < parameters.count; index++) {
-      const i3 = index * 3;
-      /**
-       * position
-       */
-      const radius = Math.random() * parameters.radius;
-      const branchAngle =
-        ((index % parameters.branches) / parameters.branches) * Math.PI * 2;
-      const spinAngle = radius * parameters.spin;
-
-      // const randomX = (Math.random() - 0.5) * parameters.randomness;
-      // const randomY = (Math.random() - 0.5) * parameters.randomness;
-      // const randomZ = (Math.random() - 0.5) * parameters.randomness;
-
-      const randomX =
-        Math.pow(Math.random(), parameters.randomnessPower) *
-        (Math.random() < 0.5 ? 1 : -1);
-      const randomY =
-        Math.pow(Math.random(), parameters.randomnessPower) *
-        (Math.random() < 0.5 ? 1 : -1);
-      const randomZ =
-        Math.pow(Math.random(), parameters.randomnessPower) *
-        (Math.random() < 0.5 ? 1 : -1);
-
-      positions[i3 + 0] = Math.cos(branchAngle + spinAngle) * radius + randomX;
-      positions[i3 + 1] = randomY;
-      positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
-
-      /**
-       * color
-       */
-      const mixedColor = colorInside
-        .clone()
-        .lerp(colorOutside, radius / parameters.radius);
-
-      color[i3 + 0] = mixedColor.r;
-      color[i3 + 1] = mixedColor.g;
-      color[i3 + 2] = mixedColor.b;
-    }
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(color, 3));
-
-    /**
-     * material
-     */
-    material = new THREE.PointsMaterial({
-      size: parameters.size,
-      sizeAttenuation: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      vertexColors: true,
-    });
-
-    /**
-     * Galaxy
-     */
-    points = new THREE.Points(geometry, material);
-    scene.add(points);
-  };
-  generateGalaxy();
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -214,8 +119,7 @@ onMounted(() => {
 
   // 实例化一个透视投影相机对象
   camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 1, 1000);
-  camera.position.set(5, 5, 5);
-  camera.lookAt(new THREE.Vector3(0, 0, 0)); //设置相机方向(指向的场景对象)
+  camera.position.z = 6;
 
   // 创建渲染器对象
   renderer = new THREE.WebGLRenderer();
@@ -224,19 +128,11 @@ onMounted(() => {
   // renderer.setClearColor(new THREE.Color("#262837")); //设置渲染器的背景颜色
   webgl.value!.appendChild(renderer.domElement);
 
-  // 创建轨道控制器
-  controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true; // 添加惯性效果
-
   const clock = new THREE.Clock(); //创建一个时钟对象，用于计算时间差
   function render() {
-    if (!camera || !renderer || !controls) return;
+    if (!camera || !renderer) return;
 
-    const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间差
-
-    // update particles
-
-    controls.update();
+    const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
 
     renderer.render(scene, camera); //执行渲染操作
     requestAnimationFrame(render); //请求再次执行函数render
@@ -249,44 +145,6 @@ onMounted(() => {
   // 创建GUI===================
   gui = new GUI();
 
-  gui
-    .add(parameters, "count", 100, 1000000, 100)
-    .name("粒子数量")
-    .onFinishChange(generateGalaxy);
-  gui
-    .add(parameters, "size", 0.001, 0.01, 0.001)
-    .name("粒子基础大小")
-    .onFinishChange(generateGalaxy);
-
-  gui
-    .add(parameters, "radius", 0.01, 20, 0.01)
-    .name("星系半径")
-    .onFinishChange(generateGalaxy);
-  gui
-    .add(parameters, "branches", 2, 20, 1)
-    .name("旋臂数量")
-    .onFinishChange(generateGalaxy);
-  gui
-    .add(parameters, "spin", -5, 5, 0.001)
-    .name("螺旋扭曲系数")
-    .onFinishChange(generateGalaxy);
-  gui
-    .add(parameters, "randomness", 0, 2, 0.001)
-    .name("分支偏移量")
-    .onFinishChange(generateGalaxy);
-
-  gui
-    .add(parameters, "randomnessPower", 1, 10, 0.001)
-    .name("随机强度指数")
-    .onFinishChange(generateGalaxy);
-  gui
-    .addColor(parameters, "insideColor")
-    .name("里粒子色值")
-    .onFinishChange(generateGalaxy);
-  gui
-    .addColor(parameters, "outsideColor")
-    .name("外粒子色值")
-    .onFinishChange(generateGalaxy);
   // 添加按钮
   // gui.add(eventObj, "hideHelpers").name("隐藏灯光辅助对象");
 
@@ -317,13 +175,50 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="webgl" class="webgl"></div>
+  <div class="container">
+    <div ref="webgl" class="webgl"></div>
+    <section class="section">
+      <h1>My Portfolio</h1>
+    </section>
+    <section class="section">
+      <h2>My projects</h2>
+    </section>
+    <section class="section">
+      <h2>Contact me</h2>
+    </section>
+  </div>
 </template>
 
 <style scoped>
+.container {
+  height: 100vh;
+  overflow-y: scroll;
+}
+
 .webgl {
   width: 100vw;
   height: 100vh;
-  background-color: #f00;
+  background-color: rgb(38, 25, 65);
+  top: 0;
+  left: 0;
+  position: fixed;
+}
+
+.section {
+  display: flex;
+  align-items: center;
+  height: 100vh;
+  position: relative;
+  font-family: "Cabin", sans-serif;
+  color: #ffeded;
+  text-transform: uppercase;
+  font-size: 7vmin;
+  padding-left: 10%;
+  padding-right: 10%;
+  /* background-color: blue; */
+}
+
+section:nth-child(odd) {
+  justify-content: flex-end;
 }
 </style>

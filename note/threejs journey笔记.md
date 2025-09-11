@@ -1589,7 +1589,7 @@ Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_
 
 branch = 3
 
-| 0    | 1     | 2     | 3    | 4     | 5     | 6    | 7     | 8     | Index = count * 3                      |
+| 0    | 1     | 2     | 3    | 4     | 5     | 6    | 7     | 8     | Index = count                          |
 | ---- | ----- | ----- | ---- | ----- | ----- | ---- | ----- | ----- | -------------------------------------- |
 | 0    | 1     | 2     | 0    | 1     | 2     | 0    | 1     | 2     | Index % branch                         |
 | 0    | 0.33  | 0.66  | 0    | 0.33  | 0.66  | 0    | 0.33  | 0.66  | Index % branch / branch                |
@@ -1599,7 +1599,7 @@ branch = 3
 
 branch = 2
 
-| 0    | 1     | 2    | 3     | 4    | 5     | 6    | 7     | 8    | Index = count * 3            |
+| 0    | 1     | 2    | 3     | 4    | 5     | 6    | 7     | 8    | Index = count                |
 | ---- | ----- | ---- | ----- | ---- | ----- | ---- | ----- | ---- | ---------------------------- |
 | 0    | 1     | 0    | 1     | 0    | 1     | 0    | 1     | 0    | Index % branch               |
 | 0    | 0.5   | 0    | 0.5   | 0    | 0.5   | 0    | 0.5   | 0    | Index % branch / branch      |
@@ -1616,6 +1616,8 @@ branch = 2
 ```
 
 ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy2.png)
+
+增加branch数量如下效果：
 
 ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy2-20.png)
 
@@ -1826,6 +1828,204 @@ alpha - 介于0到1的数字。
 ```
 
 ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy7.png)
+
+
+
+## P21 Scroll based animation
+
+一、基础样式与页面结构
+
+1. 背景色统一
+
+为避免滚动时出现白边，将页面背景色与 canvas 背景色保持一致：
+
+```css
+html {
+  background-color: #1e1a20;
+}
+```
+
+2. 页面结构设计
+
+- 容器绑定滚动和鼠标移动事件
+- 包含 3 个 section（与 3 个 3D 模型对应），文字背景透明以配合滚动效果
+
+```html
+<template>
+  <div class="container" @scroll="handleScroll" @mousemove="handleMousemove">
+    <div ref="webgl" class="webgl"></div>
+    <section class="section">
+      <h1>My Portfolio</h1>
+    </section>
+    <section class="section">
+      <h2>My projects</h2>
+    </section>
+    <section class="section">
+      <h2>Contact me</h2>
+    </section>
+  </div>
+</template>
+```
+
+二、3D 元素创建与配置
+
+1. 纹理与材质
+
+- 加载梯度纹理，使用`NearestFilter`避免模糊
+- 使用卡通材质（`MeshToonMaterial`），结合梯度纹理实现卡通阴影效果
+
+```javascript
+const texturesLoader = new THREE.TextureLoader(loadingManager);
+const gradientTexture = texturesLoader.load(getTextureUrl("gradients/3.jpg"));
+gradientTexture.magFilter = THREE.NearestFilter;
+
+const material = new THREE.MeshToonMaterial({
+  color: parameters.materialColor,
+  gradientMap: gradientTexture,
+});
+```
+
+2. 几何体创建
+
+创建 3 种不同几何体（圆环、圆锥、环面结），共用同一材质：
+
+```javascript
+const mesh1 = new THREE.Mesh(new THREE.TorusGeometry(1, 0.4, 16, 60), material);
+const mesh2 = new THREE.Mesh(new THREE.ConeGeometry(1, 2, 32), material);
+const mesh3 = new THREE.Mesh(new THREE.TorusKnotGeometry(0.8, 0.35, 100, 16), material);
+scene.add(mesh1, mesh2, mesh3);
+```
+
+3. **模型定位**
+
+沿 Y 轴按固定距离排列 3 个模型（`objectsDistance`控制间距）：
+
+```javascript
+const objectsDistance = 4;
+mesh1.position.y = -objectsDistance * 0; // 第一个模型位置
+mesh2.position.y = -objectsDistance * 1; // 第二个模型位置
+mesh3.position.y = -objectsDistance * 2; // 第三个模型位置
+```
+
+4. GUI 调试
+
+添加材质颜色调整控件，同步更新模型和粒子颜色：
+
+```javascript
+const parameters = { materialColor: "#ffeded" };
+gui.addColor(parameters, "materialColor")
+  .name("材质颜色")
+  .onChange(() => {
+    material.color.set(parameters.materialColor);
+    particlesMaterial.color.set(parameters.materialColor);
+  });
+```
+
+三、交互逻辑实现
+
+1. 滚动监听
+
+记录滚动位置，用于控制相机和触发动画：
+
+```javascript
+const handleScroll = (event: Event) => {
+  const target = event.target as HTMLElement | null;
+  if (!target) return;
+  scrollY = target.scrollTop; // 保存滚动距离
+};
+```
+
+2. **相机随滚动移动**
+
+根据滚动位置动态调整相机 Y 轴位置，实现 "滚动浏览 3D 模型" 效果：
+
+```javascript
+function render() {
+  // 相机Y轴位置与滚动距离关联（滚动越远，相机越靠下）
+  camera.position.y = (-scrollY / sizes.height) * objectsDistance;
+  renderer.render(scene, camera);
+  requestAnimationFrame(render);
+}
+render();
+```
+
+3. **鼠标交互优化**
+
+使用相机组（`cameraGroup`）实现平滑视差效果，避免与滚动动画冲突：
+
+```javascript
+// 鼠标位置转化为视差偏移量
+const parallaxX = -cursor.x;
+const parallaxY = cursor.y;
+const CAMERA_SPEED = 5; // 平滑速度系数
+
+// 基于deltaTime（帧间隔时间）实现平滑移动
+cameraGroup.position.x += (parallaxX - cameraGroup.position.x) * CAMERA_SPEED * deltaTime;
+cameraGroup.position.y += (parallaxY - cameraGroup.position.y) * CAMERA_SPEED * deltaTime;
+```
+
+四、粒子背景效果
+
+1. 粒子几何与材质
+
+- 随机生成 200 个粒子的 3D 位置（分布在模型周围）
+- 使用点材质（`PointsMaterial`），大小随距离衰减
+
+```javascript
+// 粒子位置数据（Float32Array存储3D坐标）
+const particlesCount = 200;
+const position = new Float32Array(particlesCount * 3);
+for (let index = 0; index < particlesCount; index++) {
+  const i3 = index * 3;
+  position[i3 + 0] = (Math.random() - 0.5) * 10; // X轴随机范围
+  position[i3 + 1] = (Math.random() - 0.5) * objectsDistance * 3 - objectsDistance; // Y轴范围（覆盖3个模型）
+  position[i3 + 2] = (Math.random() - 0.5) * 10; // Z轴随机范围
+}
+
+// 创建粒子网格
+const particlesGeometry = new THREE.BufferGeometry();
+particlesGeometry.setAttribute("position", new THREE.BufferAttribute(position, 3));
+const particlesMaterial = new THREE.PointsMaterial({
+  color: parameters.materialColor,
+  size: 0.03,
+  sizeAttenuation: true, // 大小随距离衰减
+});
+const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+scene.add(particlesMesh);
+```
+
+五、**滚动触发动画**
+
+当滚动切换到新 section 时，触发对应模型的旋转动画：
+
+```javascript
+const handleScroll = (event: Event) => {
+  // ... 省略滚动位置更新代码 ...
+
+  // 计算当前section（滚动高度 / 页面高度 取整）
+  const newScetion = Math.round(scrollY / sizes.height);
+  if (currentSection === newScetion) return; // 避免重复触发
+  currentSection = newScetion;
+
+  // 使用GSAP实现模型旋转动画
+  gsap.to(meshArray[currentSection].rotation, {
+    duration: 1.5, // 动画时长
+    ease: "power2.inOut", // 缓动函数
+    x: "+=6", // X轴旋转增加6弧度
+    y: "+=3", // Y轴旋转增加3弧度
+    z: "+=1.5", // Z轴旋转增加1.5弧度
+  });
+};
+
+		// 更改mesh转动的赋值，由直接赋值改为增加变化
+    // Animate meshes
+    meshArray.forEach((mesh) => {
+      // mesh.rotation.x = elapsedTime * 0.1;
+      // mesh.rotation.y = elapsedTime * 0.12;
+      mesh.rotation.x += deltaTime * 0.1;
+      mesh.rotation.y += deltaTime * 0.12;
+    });
+```
 
 
 

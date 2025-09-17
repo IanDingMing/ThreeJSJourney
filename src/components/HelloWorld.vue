@@ -14,8 +14,7 @@ import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
 import { getTextureUrl } from "@/utils/texturesUtils";
 // 导入RectAreaLightHelper
 import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
-import { update } from "three/examples/jsm/libs/tween.module.js";
-import { parameter } from "three/tsl";
+import * as CANNON from "cannon-es";
 
 // 使用FontLoader加载字体
 const fontLoader = new FontLoader();

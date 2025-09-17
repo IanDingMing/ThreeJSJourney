@@ -40,8 +40,14 @@ loadingManager.onError = (url) => {
 const texturesLoader = new THREE.TextureLoader(loadingManager);
 const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
 // 加载纹理
-const gradientTexture = texturesLoader.load(getTextureUrl("gradients/3.jpg"));
-gradientTexture.magFilter = THREE.NearestFilter;
+const environmentMapTexture = cubeTextureLoader.load([
+  "/textures/environmentMaps/0/px.png",
+  "/textures/environmentMaps/0/nx.png",
+  "/textures/environmentMaps/0/py.png",
+  "/textures/environmentMaps/0/ny.png",
+  "/textures/environmentMaps/0/pz.png",
+  "/textures/environmentMaps/0/nz.png",
+]);
 
 const sizes = {
   width: 800,
@@ -55,8 +61,6 @@ let renderer: THREE.WebGLRenderer | null = null;
 let controls: OrbitControls | null = null;
 let gui: GUI | null = null;
 const meshArray: THREE.Mesh[] = [];
-let scrollY: number = -1;
-let currentSection = 0;
 
 const cursor = {
   x: 0,
@@ -100,31 +104,6 @@ const handleDoubleClick = () => {
     document.exitFullscreen();
   }
 };
-const handleScroll = (event: Event) => {
-  const target = event.target as HTMLElement | null;
-  if (!target) return;
-  // console.log("滚动位置:", event.target.scrollTop);
-  scrollY = target.scrollTop;
-
-  const newScetion = Math.round(scrollY / sizes.height);
-  if (currentSection === newScetion) return;
-  currentSection = newScetion;
-  console.log("changed", currentSection);
-
-  gsap.to(meshArray[currentSection].rotation, {
-    duration: 1.5,
-    ease: "power2.inOut",
-    x: "+=6",
-    y: "+=3",
-    z: "+=1.5",
-  });
-};
-
-const handleMousemove = (event: MouseEvent) => {
-  cursor.x = event.clientX / sizes.width - 0.5;
-  cursor.y = event.clientY / sizes.height - 0.5;
-  // console.log(event.clientX, event.clientY, cursor);
-};
 
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
@@ -137,102 +116,74 @@ onMounted(() => {
 
   // 模型mesh==========================
   /**
-   * Test cube
+   * Test sphere
    */
-  const cube = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshBasicMaterial({ color: "#ff0000" })
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 32, 32),
+    new THREE.MeshStandardMaterial({
+      metalness: 0.3,
+      roughness: 0.4,
+      envMap: environmentMapTexture,
+    })
   );
-  // scene.add(cube);
+  sphere.castShadow = true;
+  sphere.position.y = 0.5;
+  scene.add(sphere);
 
   /**
-   * Objects
+   * Floor
    */
-  const objectsDistance = 4;
-  const material = new THREE.MeshToonMaterial({
-    color: parameters.materialColor,
-    gradientMap: gradientTexture,
-  });
-  const mesh1 = new THREE.Mesh(
-    new THREE.TorusGeometry(1, 0.4, 16, 60),
-    material
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 10),
+    new THREE.MeshStandardMaterial({
+      color: "#777777",
+      metalness: 0.3,
+      roughness: 0.4,
+      envMap: environmentMapTexture,
+    })
   );
-  const mesh2 = new THREE.Mesh(new THREE.ConeGeometry(1, 2, 32), material);
-  const mesh3 = new THREE.Mesh(
-    new THREE.TorusKnotGeometry(0.8, 0.35, 100, 16),
-    material
-  );
-
-  // mesh1.position.y = 2;
-  // mesh1.scale.set(0.5, 0.5, 0.5);
-
-  // mesh2.visible = false;
-
-  // mesh3.position.y = -2;
-  // mesh3.scale.set(0.5, 0.5, 0.5);
-
-  mesh1.position.y = -objectsDistance * 0;
-  mesh2.position.y = -objectsDistance * 1;
-  mesh3.position.y = -objectsDistance * 2;
-
-  mesh1.position.x = 2;
-  mesh2.position.x = -2;
-  mesh3.position.x = 2;
-
-  meshArray.push(mesh1, mesh2, mesh3);
-  scene.add(mesh1, mesh2, mesh3);
+  floor.receiveShadow = true;
+  floor.rotation.x = -Math.PI * 0.5;
+  scene.add(floor);
 
   /**
-   * Particles
+   * Lights
    */
-  //Geometry
-  const particlesCount = 200;
-  const position = new Float32Array(particlesCount * 3);
-  for (let index = 0; index < particlesCount; index++) {
-    const i3 = index * 3;
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+  scene.add(ambientLight);
 
-    position[i3 + 0] = (Math.random() - 0.5) * 10;
-    position[i3 + 1] =
-      (Math.random() - 0.5) * objectsDistance * meshArray.length -
-      objectsDistance;
-    position[i3 + 2] = (Math.random() - 0.5) * 10;
-  }
-  const particlesGeometry = new THREE.BufferGeometry();
-  particlesGeometry.setAttribute(
-    "position",
-    new THREE.BufferAttribute(position, 3)
-  );
-  // Material
-  const particlesMaterial = new THREE.PointsMaterial({
-    color: parameters.materialColor,
-    size: 0.03,
-    sizeAttenuation: true,
-  });
-  // Point
-  const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
-  scene.add(particlesMesh);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.2);
+  directionalLight.castShadow = true;
+  directionalLight.shadow.mapSize.set(1024, 1024);
+  directionalLight.shadow.camera.far = 15;
+  directionalLight.shadow.camera.left = -7;
+  directionalLight.shadow.camera.top = 7;
+  directionalLight.shadow.camera.right = 7;
+  directionalLight.shadow.camera.bottom = -7;
+  directionalLight.position.set(5, 5, 5);
+  scene.add(directionalLight);
+
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
 
-  // 添加灯光
-  const directionalLight = new THREE.DirectionalLight("#ffffff", 1);
-  directionalLight.position.set(1, 1, 0);
-  scene.add(directionalLight);
-
-  // 实例化一个透视投影相机对象
-  const cameraGroup = new THREE.Group();
-  scene.add(cameraGroup);
-
-  camera = new THREE.PerspectiveCamera(
-    35,
+  /**
+   * Camera
+   */
+  // Base camera
+  const camera = new THREE.PerspectiveCamera(
+    75,
     sizes.width / sizes.height,
     0.1,
-    1000
+    100
   );
-  camera.position.z = 6;
-  cameraGroup.add(camera);
+  camera.position.set(-3, 3, 3);
+  scene.add(camera);
+
+  // Controls
+  controls = new OrbitControls(camera, webgl.value);
+  controls.enableDamping = true;
 
   // 创建渲染器对象
   renderer = new THREE.WebGLRenderer();
@@ -242,34 +193,16 @@ onMounted(() => {
   webgl.value!.appendChild(renderer.domElement);
 
   const clock = new THREE.Clock(); //创建一个时钟对象，用于计算时间差
-  let previousTime = 0;
   function render() {
-    if (!camera || !renderer) return;
+    if (!camera || !renderer || !controls) return;
 
     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
-    const deltaTime = elapsedTime - previousTime;
-    previousTime = elapsedTime;
-
-    // Animate camera
-    camera.position.y = (-scrollY / sizes.height) * objectsDistance;
-
-    const parallaxX = -cursor.x;
-    const parallaxY = cursor.y;
-    // cameraGroup.position.x = parallaxX;
-    // cameraGroup.position.y = parallaxY;
-    // cameraGroup.position.x += (parallaxX - cameraGroup.position.x) * 0.02;
-    // cameraGroup.position.y += (parallaxY - cameraGroup.position.y) * 0.02;
-    const CAMERA_SPEED = 5; // 明确速度变量
-    cameraGroup.position.x +=
-      (parallaxX - cameraGroup.position.x) * CAMERA_SPEED * deltaTime;
-    cameraGroup.position.y +=
-      (parallaxY - cameraGroup.position.y) * CAMERA_SPEED * deltaTime;
 
     // Animate meshes
-    meshArray.forEach((mesh) => {
-      mesh.rotation.x += deltaTime * 0.1;
-      mesh.rotation.y += deltaTime * 0.12;
-    });
+    meshArray.forEach((mesh) => {});
+
+    // Update controls
+    controls.update();
 
     renderer.render(scene, camera); //执行渲染操作
     requestAnimationFrame(render); //请求再次执行函数render
@@ -281,15 +214,6 @@ onMounted(() => {
 
   // 创建GUI===================
   gui = new GUI();
-
-  // 添加按钮
-  gui
-    .addColor(parameters, "materialColor")
-    .name("材质颜色")
-    .onChange(() => {
-      material.color.set(parameters.materialColor);
-      particlesMaterial.color.set(parameters.materialColor);
-    });
 
   // 创建GUI===================
 });
@@ -318,17 +242,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="container" @scroll="handleScroll" @mousemove="handleMousemove">
+  <div class="container">
     <div ref="webgl" class="webgl"></div>
-    <section class="section">
-      <h1>My Portfolio</h1>
-    </section>
-    <section class="section">
-      <h2>My projects</h2>
-    </section>
-    <section class="section">
-      <h2>Contact me</h2>
-    </section>
   </div>
 </template>
 

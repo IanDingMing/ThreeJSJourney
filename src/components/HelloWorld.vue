@@ -40,12 +40,12 @@ const texturesLoader = new THREE.TextureLoader(loadingManager);
 const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
 // 加载纹理
 const environmentMapTexture = cubeTextureLoader.load([
-  "/textures/environmentMaps/0/px.png",
-  "/textures/environmentMaps/0/nx.png",
-  "/textures/environmentMaps/0/py.png",
-  "/textures/environmentMaps/0/ny.png",
-  "/textures/environmentMaps/0/pz.png",
-  "/textures/environmentMaps/0/nz.png",
+  getTextureUrl("environmentMaps/0/px.jpg"),
+  getTextureUrl("environmentMaps/0/nx.jpg"),
+  getTextureUrl("environmentMaps/0/py.jpg"),
+  getTextureUrl("environmentMaps/0/ny.jpg"),
+  getTextureUrl("environmentMaps/0/pz.jpg"),
+  getTextureUrl("environmentMaps/0/nz.jpg"),
 ]);
 
 const sizes = {

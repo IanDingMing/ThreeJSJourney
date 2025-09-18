@@ -148,7 +148,10 @@ function render() {
 }
 ```
 
+[原理详解](#render 中`clock.getDelta()`输出 0 的问题)***核心原则：同一帧内，`getElapsedTime()`与`getDelta()`二选一，避免重复调用（前者已包含后者的逻辑）***
+
 ### 2. 帧率无关的旋转优化 
+
 - **解决关键问题**：不同刷新率屏幕的动画速度不一致
 - 实现帧率无关的恒定速度旋转：
   ```javascript
@@ -2029,32 +2032,1158 @@ const handleScroll = (event: Event) => {
 
 ## P22 Physics
 
-物理引擎
+### 物理引擎选择对比
 
-Ammo.js
+我们使用的是 ` "cannon-es": "^0.15.1"`
 
-Cannon.js
+| 引擎          | 特点                              | 适用场景         |
+| ------------- | --------------------------------- | ---------------- |
+| **cannon.js** | 轻量级，API 简洁，性能适中        | 中小型 3D 项目   |
+| **ammo.js**   | 功能强大（Bullet 移植），性能优异 | 复杂物理效果需求 |
+| **oimo.js**   | 体积小巧，性能优秀                | 简单物理模拟场景 |
 
-Oimo.js
+### cannon.js核心概念
 
-1. **cannon.js**
-   - 轻量级的 3D 物理引擎，API 设计简洁直观
-   - 支持常见的物理效果：碰撞检测、刚体动力学、关节约束等
-   - 性能适中，适合中小型 3D 项目使用
-   - 社区活跃，文档相对完善
-2. **ammo.js**
-   - 是 Bullet 物理引擎的 JavaScript 移植版本（通过 Emscripten 编译）
-   - 功能最强大，支持复杂的物理效果：软刚体、布料模拟、车辆物理等
-   - 性能优异，适合对物理效果要求高的项目
-   - 但体积较大，API 相对复杂
-   - 通常与 Three.js 等 3D 库配合使用，实现高质量的物理模拟
-3. **oimo.js**
-   - 轻量级物理引擎，兼顾 2D 和 3D 物理模拟
-   - 体积小巧，性能优秀，适合对文件大小有严格要求的项目
-   - API 设计简洁，易于上手
-   - 功能相对前两者较少，适合简单的物理模拟场景
+[Cannon.js 核心属性与方法速查表](#Cannon.js 核心属性与方法速查表)
+
+#### 质量 (mass) 属性
+
+- **质量为 0**：静止刚体，不受外力影响（地面、墙壁等）
+- **质量 > 0**：动态刚体，受重力、碰撞力影响
+- `mass: 1` 表示这个球体是动态物体，会在重力作用下下落，并且能与其他物体产生符合质量比例的碰撞反应（例如碰撞时，质量大的物体对质量小的物体的冲击力更大）。
+- 如果将 `mass` 设为 0，这个球体就会悬浮在初始位置（0, 3, 0），不受重力和碰撞影响，成为一个固定点。
+
+```javascript
+// 动态刚体示例
+const sphereBody = new CANNON.Body({
+  mass: 1,  // 动态物体,质量为1单位
+  position: new CANNON.Vec3(0, 3, 0),
+  shape: sphereShape,
+});
+```
+
+#### 物理世界步进 (step) 方法
+
+`world.step(dt, [timeSinceLastCalled], [maxSubSteps=10])`[参数详解](#world.step() )
+
+```javascript
+// 简单模式（固定步长）
+world.step(1/60);
+
+// 插值模式（适应帧率波动）
+let lastTime = 0;
+function animate(currentTime) {
+  const timeSinceLastCalled = (currentTime - lastTime) / 1000;
+  lastTime = currentTime;
+  world.step(1/60, timeSinceLastCalled, 5);
+}
+```
+
+| 模式     | 参数                       | 特点       | 适用场景     |
+| -------- | -------------------------- | ---------- | ------------ |
+| 简单模式 | 只传 `dt`                  | 固定步长   | 帧率稳定场景 |
+| 插值模式 | `dt + timeSinceLastCalled` | 动态子步骤 | 帧率波动场景 |
+
+### 材质系统
+
+#### 全局默认材质配置
+
+展示了一种更简洁的 Cannon.js 材质配置方式，适合大多数简单场景，常规更复杂配置，详见 [材质配置方式](#材质配置方式 )
+
+```javascript
+// 1. 创建材质
+const defaultMaterial = new CANNON.Material("default");
+
+// 2. 创建碰撞规则
+const defaultContactMaterial = new CANNON.ContactMaterial(
+  defaultMaterial,    // 材质A：默认材质
+  defaultMaterial,    // 材质B：默认材质（自身与自身碰撞）
+  { 
+    friction: 0.1,    // 全局默认摩擦系数
+    restitution: 0.7  // 全局默认反弹系数
+  }
+);
+
+// 3. 添加到世界
+world.addContactMaterial(defaultContactMaterial); // 添加到世界
+world.defaultContactMaterial = defaultContactMaterial; // 设为全局默认
+```
+
+### 力与冲量应用
+
+#### 方法对比 [力与冲量方法详解](#力与冲量方法详解 )
+
+| 方法                  | 类型     | 坐标系     | 应用场景           |
+| --------------------- | -------- | ---------- | ------------------ |
+| `applyForce()`        | 持续力   | 世界坐标系 | 风力、持续推力     |
+| `applyImpulse()`      | 瞬时冲量 | 世界坐标系 | 碰撞、踢球         |
+| `applyLocalForce()`   | 持续力   | 局部坐标系 | 物体自带推进器     |
+| `applyLocalImpulse()` | 瞬时冲量 | 局部坐标系 | 从物体局部发射炮弹 |
+
+#### 使用原则
+
+- **持续效果**：写在 `render` 循环中
+- **瞬时效果**：在事件中单次调用
+
+```javascript
+// 持续力（每帧调用）
+function render() {
+  sphereBody.applyForce(
+    new CANNON.Vec3(0.1, 0, 0),
+    sphereBody.position
+  );
+  // ...
+}
+
+// 瞬时力（事件触发）
+document.addEventListener('click', () => {
+  sphereBody.applyImpulse(
+    new CANNON.Vec3(5, 0, 0),
+    sphereBody.position
+  );
+});
+```
+
+### 旋转控制（四元数）
+
+```javascript
+// 创建旋转四元数
+const quat = new CANNON.Quaternion().setFromAxisAngle(
+  new CANNON.Vec3(1, 0, 0),  // 旋转轴（X轴）
+  Math.PI / 2                // 旋转角度（弧度）
+);
+
+// 应用到物体
+floorBody.quaternion = quat;
+```
+
+### Three.js 与 Cannon.js 集成
+
+#### 统一参数创建方法
+
+```typescript
+interface Position {
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface UpdateObject {
+  mesh: THREE.Mesh;
+  body: CANNON.Body;
+}
+
+  const objectsToUpdate: UpdateObject[] = [];
+  const sphereGeometry = new THREE.SphereGeometry(1, 20, 20);
+  const sphereMaterial = new THREE.MeshStandardMaterial({
+    metalness: 0.3,
+    roughness: 0.4,
+    envMap: environmentMapTexture,
+  });
+
+// 创建球体
+const createSphere = (radius: number, position: Position): void => {
+  // Three.js 网格
+  const mesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
+  mesh.scale.set(radius, radius, radius);  // 通过缩放保持参数一致
+  mesh.position.set(position.x, position.y, position.z);
+  scene.add(mesh);
+
+  // Cannon.js 刚体
+  const shape = new CANNON.Sphere(radius);
+  const body = new CANNON.Body({
+    mass: 1,
+    position: new CANNON.Vec3(position.x, position.y, position.z),
+    shape,
+  });
+
+  world.addBody(body);
+
+  // 保存更新对象
+  objectsToUpdate.push({ mesh, body });
+};
+
+  createSphere(0.5, { x: 0, y: 3, z: 0 });
+```
+
+思考：[createSphere方法中为什么这么写`mesh.scale.set(radius, radius, radius);`](#createSphere方法优化)
+
+#### 同步物理与渲染状态
+
+```javascript
+function render() {
+  // ... 省略滚动位置更新代码 ...
+  const deltaTime = clock.getDelta();
+  const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
+  
+  // 更新物理世界
+  world.step(1 / 60, deltaTime, 3);
+
+  // 同步位置和旋转
+  objectsToUpdate.forEach((element) => {
+    element.mesh.position.set(
+      element.body.position.x,
+      element.body.position.y,
+      element.body.position.z
+    );
+  });
+  // ... 省略滚动位置更新代码 ...
+}
+```
+
+#### 创建立方体
+
+```typescript
+const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+const boxMaterial = new THREE.MeshStandardMaterial({
+  metalness: 0.3,
+  roughness: 0.4,
+  envMap: environmentMapTexture,
+});
+const createBox = (
+  width: number,
+  height: number,
+  depth: number,
+  position: Position
+): void => {
+  // Three.js 网格
+  const mesh = new THREE.Mesh(boxGeometry, boxMaterial);
+  mesh.scale.set(width, height, depth);
+  mesh.position.set(position.x, position.y, position.z);
+  scene.add(mesh);
+
+  // Cannon.js 刚体
+  const shape = new CANNON.Box(
+    new CANNON.Vec3(width / 2, height / 2, depth / 2)
+  );
+  const body = new CANNON.Body({
+    mass: 1,
+    position: new CANNON.Vec3(position.x, position.y, position.z),
+    shape,
+  });
+
+  world.addBody(body);
+  objectsToUpdate.push({ mesh, body });
+};
+```
+
+思考：[立方体为什么不回翻滚倒下？](#为什么必须同步旋转（`quaternion.set`）)
+
+### 性能优化
+
+```javascript
+// 使用 SAP 广义相位算法
+world.broadphase = new CANNON.SAPBroadphase(world);
+
+// 允许物体休眠
+world.allowSleep = true;
+```
+
+### 声音效果
+
+- 特别注意，这里添加的声音事件，是给**物理引擎的body属性**添加的，并**不是js中的元素body**
+
+[更加真实的声音效果](#声音效果ai优化版本)
+
+```javascript
+// 碰撞声音
+const hitSound = new Audio("./sounds/hit.mp3");
+
+const playHitSound = (collision) => {
+  const impactStrength = collision.contact.getImpactVelocityAlongNormal();
+  if (impactStrength < 1.5) return;// 冲击力大小播放声音，更加真实，小于1.5部播放
+  
+  hitSound.volume = Math.random();  // 随机音量增加真实感
+  hitSound.currentTime = 0;         // 重置播放，解决播放声音连续问题
+  hitSound.play();
+};
+
+// 给刚体添加碰撞事件监听
+const createBox = (
+    width: number,
+    height: number,
+    depth: number,
+    position: Position
+  ): void => {
+    // ... 省略滚动位置更新代码 ...
+
+    // Cannon.js body
+    const shape = new CANNON.Box(
+      new CANNON.Vec3(width / 2, height / 2, depth / 2)
+    );
+    const body = new CANNON.Body({
+      mass: 1,
+      position: new CANNON.Vec3(position.x, position.y, position.z),
+      shape,
+    });
+    body.addEventListener("collide", playHitSound);// 添加声音
+    world.addBody(body);
+  
+    // ... 省略滚动位置更新代码 ...
+  };
+```
+
+### 场景重置
+
+```javascript
+const resetScene = () => {
+  objectsToUpdate.forEach((element) => {
+    // 移除物理体
+    element.body.removeEventListener("collide", playHitSound);
+    world.removeBody(element.body);
+    
+    // 移除网格
+    scene.remove(element.mesh);
+  });
+
+  // 清空更新数组
+  objectsToUpdate.splice(0, objectsToUpdate.length);
+};
+```
+
+### GUI 控制界面
+
+```javascript
+const gui = new GUI();
+const debugObject = {
+  createSphere: () => {
+    createSphere(Math.random() * 0.5, {
+      x: Math.random() * 3,
+      y: 3,
+      z: Math.random() * 3,
+    });
+  },
+  createBox: () => {
+    createBox(Math.random(), Math.random(), Math.random(), {
+      x: (Math.random() - 0.5) * 3,
+      y: 3,
+      z: (Math.random() - 0.5) * 3,
+    });
+  },
+  reset: resetScene
+};
+
+gui.add(debugObject, "createSphere");
+gui.add(debugObject, "createBox");
+gui.add(debugObject, "reset");
+```
+
+
+
+
+
+
 
 # 附录
+
+## render 中`clock.getDelta()`输出 0 的问题
+
+**一、问题现象**
+
+在第一个`render`函数中，先调用`clock.getElapsedTime()`，再调用`clock.getDelta()`，控制台打印的`deltaTime`始终为 0；而第二个仅调用`clock.getDelta()`的`render`函数，`deltaTime`首帧正常（非 0），后续也能稳定输出帧间隔时间。
+
+关键代码对比：
+
+```javascript
+// 问题代码（deltaTime输出0）
+const clock = new THREE.Clock();
+function render() {
+  const elapsedTime = clock.getElapsedTime(); // 先调用
+  const deltaTime = clock.getDelta();        // 后调用，输出0
+  console.log(deltaTime);
+  requestAnimationFrame(render);
+}
+
+// 正常代码（deltaTime输出正常）
+const clock = new THREE.Clock();
+function render() {
+  const deltaTime = clock.getDelta(); // 仅调用getDelta()，输出正常
+  console.log(deltaTime);
+  requestAnimationFrame(render);
+}
+```
+
+**二、核心原因：`THREE.Clock`的方法依赖逻辑**
+
+**问题本质**：第一个 render 中，`getElapsedTime()` 内部提前调用了 `getDelta()`，更新了 `oldTime`，导致后续手动调用 `getDelta()` 时时间差为 0。
+
+**1. `Clock`内部关键变量与方法逻辑**
+
+`Clock`维护两个核心变量：
+
+- `oldTime`：上一次调用`getDelta()`时的时间戳（初始值 =`Clock`实例化时间）；
+- `elapsedTime`：从`Clock`实例化到当前的总时间（初始值 = 0）。
+
+两个方法的核心逻辑（简化版源码）：
+
+```javascript
+// 1. getDelta()：计算“当前时间 - oldTime”，并更新状态
+getDelta() {
+  const now = 当前时间（毫秒）;
+  const diff = (now - this.oldTime) / 1000; // 转秒，即时间差
+  this.oldTime = now; // 更新oldTime为当前时间
+  this.elapsedTime += diff; // 累计总时间
+  return diff;
+}
+
+// 2. getElapsedTime()：获取总时间，但先调用getDelta()
+getElapsedTime() {
+  // 关键！先执行getDelta()更新时间状态，再返回总时间
+  return this.getDelta() + this.elapsedTime;
+}
+```
+
+**2. 问题代码的执行流程（一步步拆解）**
+
+在第一个`render`函数中，代码执行顺序触发 “时间差被提前消耗”：
+
+1. **第一步：调用`clock.getElapsedTime()`**
+
+   - 内部自动执行
+
+     ```
+     getDelta()
+     ```
+
+     - 计算`now（当前时间） - oldTime（初始值=实例化时间）`→ 得到正常时间差（如 0.01 秒）；
+     - 更新`oldTime = now`（此时`oldTime`已变为 “当前时间”）；
+     - 更新`elapsedTime += 0.01`→ 总时间变为 0.01 秒；
+
+   - `getElapsedTime()`返回`0.01（getDelta()结果） + 0（初始elapsedTime）`→ 总时间 = 0.01 秒。
+
+2. **第二步：调用`clock.getDelta()`**
+
+   - 此时`oldTime`已被第一步的`getDelta()`更新为 “当前时间”；
+
+   - 再次计算
+
+     ```
+     now（新当前时间） - oldTime（第一步的当前时间）
+     ```
+
+     - 因两步代码执行速度极快（微秒级），`now`与`oldTime`几乎完全相同；
+     - 时间差`diff ≈ 0`→ `deltaTime`输出 0。
+
+**三、解决方案：调整调用逻辑**
+
+核心原则：**同一帧内，`getElapsedTime()`与`getDelta()`二选一，避免重复调用**（前者已包含后者的逻辑）。
+
+**方案 1：先调用`getDelta()`，再读`elapsedTime`**
+
+`getDelta()`会自动更新`elapsedTime`，直接读取`clock.elapsedTime`即可获取总时间，无需调用`getElapsedTime()`：
+
+```javascript
+const clock = new THREE.Clock();
+function render() {
+  // 1. 先调用getDelta()，获取正常时间差
+  const deltaTime = clock.getDelta(); 
+  // 2. 直接读取elapsedTime（已被getDelta()更新）
+  const elapsedTime = clock.elapsedTime; 
+  console.log(deltaTime); // 输出正常（如0.01~0.02秒）
+  
+  // 后续逻辑：用deltaTime做动画（帧率无关），用elapsedTime做时间相关逻辑
+  mesh.rotation.y += 0.5 * deltaTime;
+  requestAnimationFrame(render);
+}
+```
+
+**方案 2：若需`getElapsedTime()`，则不手动调用`getDelta()`**
+
+`getElapsedTime()`内部已执行`getDelta()`，可通过 “总时间差值” 间接获取时间差（适合需总时间的场景）：
+
+```javascript
+const clock = new THREE.Clock();
+let prevElapsedTime = 0; // 记录上一帧的总时间
+
+function render() {
+  // 1. 调用getElapsedTime()，内部已更新时间
+  const elapsedTime = clock.getElapsedTime(); 
+  // 2. 时间差 = 当前总时间 - 上一帧总时间
+  const deltaTime = elapsedTime - prevElapsedTime; 
+  console.log(deltaTime); // 输出正常
+  
+  prevElapsedTime = elapsedTime; // 更新上一帧总时间
+  requestAnimationFrame(render);
+}
+```
+
+**四、核心原则总结**
+
+1. **`getElapsedTime()`是`getDelta()`的 “超集”**：前者内部已包含后者的逻辑，无需在同一帧内重复调用；
+2. **`getDelta()`的核心价值**：获取 “相邻两次调用的时间差”，用于实现帧率无关的动画（如`物体旋转 = 速度 × deltaTime`）；
+3. **避免时间差被提前消耗**：同一帧内，优先调用`getDelta()`，再通过`clock.elapsedTime`获取总时间，是最安全的用法。
+
+------
+
+### world.step() 
+
+```javascript
+world.step(dt, [timeSinceLastCalled], [maxSubSteps=10])
+```
+
+1. **`dt`（必填）**
+
+   - 类型：`Number`（秒）
+   - 含义：**固定时间步长**（每个物理子步骤的时长）。
+   - 作用：物理引擎内部计算时使用的固定时间间隔，决定了单次物理模拟的精度。
+   - 示例：`dt = 1/60` 表示每个子步骤模拟 1/60 秒的物理过程。
+
+2. **`timeSinceLastCalled`（可选）**
+
+   - 类型：`Number`（秒）
+   - 含义：自上一次调用 `step()` 方法以来，真实流逝的时间（即 “帧间隔时间”）。
+   - 作用：用于启用 “插值模式”，当实际帧间隔大于 `dt` 时，将时间分解为多个 `dt` 子步骤，避免物理模拟跳跃。
+   - 示例：如果浏览器卡顿，两帧间隔 0.1 秒（100ms），则 `timeSinceLastCalled = 0.1`。
+
+3. **`maxSubSteps`（可选，默认值：10）**
+
+   - 类型：`Number`
+
+     含义：单次 `step()` 调用中允许的最大子步骤数量。
+
+   - 作用：限制物理计算的最大工作量，防止因 `timeSinceLastCalled` 过大（如浏览器冻结后恢复）导致的性能崩溃。
+
+### 两种工作模式
+
+根据是否传入 `timeSinceLastCalled`，`step()` 有两种使用模式：
+
+#### 1. 简单模式（无插值，固定步长）
+
+只传入 `dt`，适用于帧率稳定的场景：
+
+```javascript
+// 每帧固定模拟 1/60 秒的物理过程
+world.step(1/60); 
+```
+
+- 原理：忽略实际帧间隔，强制每帧按 `dt` 推进物理世界。
+- 优点：简单直观，计算量固定。
+- 缺点：若实际帧率波动（如低于 60fps），物理运动会显得 “卡顿” 或 “加速”。
+
+#### 2. 插值模式（多子步骤，适应帧率波动）
+
+传入 `dt` + `timeSinceLastCalled`（通常配合 `maxSubSteps`），适用于对物理稳定性要求高的场景：
+
+```javascript
+// 记录上一帧时间
+let lastTime = 0;
+
+function animate(currentTime) {
+  // 计算当前帧与上一帧的时间差（秒）
+  const timeSinceLastCalled = (currentTime - lastTime) / 1000;
+  lastTime = currentTime;
+
+  // 插值模式：将时间差分解为多个 dt 子步骤
+  world.step(1/60, timeSinceLastCalled, 5); // 最多5个子步骤
+  // ... 同步物理位置到渲染物体
+  requestAnimationFrame(animate);
+}
+```
+
+- 原理：
+  当 `timeSinceLastCalled = 0.1` 秒，`dt = 1/60 ≈ 0.0167` 秒时，引擎会自动计算需要 `0.1 / 0.0167 ≈ 6` 个子步骤，但受限于 `maxSubSteps=5`，实际执行 5 个子步骤（共模拟 `5×0.0167≈0.0835` 秒），剩余时间累积到下一帧。
+- 优点：物理模拟不受帧率波动影响，运动更平滑、稳定（尤其避免高速物体 “穿墙”）。
+- 缺点：实现稍复杂，计算量随 `timeSinceLastCalled` 动态变化。
+
+#### 关键区别总结
+
+| 模式     | 参数使用                      | 适用场景                     | 核心特点                     |
+| -------- | ----------------------------- | ---------------------------- | ---------------------------- |
+| 简单模式 | 只传 `dt`                     | 帧率稳定、简单场景           | 固定步长，忽略实际时间差     |
+| 插值模式 | 传 `dt + timeSinceLastCalled` | 帧率波动大、精度要求高的场景 | 动态分解时间为子步骤，更稳定 |
+
+------
+
+## 材质配置方式
+
+### 常规材质配置方式
+
+#### 1. 定义基础材质（Material）
+
+创建具体材质实例，代表物体表面属性：
+
+```javascript
+// 定义两种材质：混凝土和塑料
+const concreteMaterial = new CANNON.Material("concrete"); // 名称仅用于标识
+const plasticMaterial = new CANNON.Material("plastic");
+```
+
+#### 2. 定义材质间的碰撞规则（ContactMaterial）
+
+指定两种材质碰撞时的摩擦系数和反弹系数：
+
+```javascript
+// 定义"混凝土-塑料"碰撞规则
+const concretePlasticContactMaterial = new CANNON.ContactMaterial(
+  concreteMaterial,   // 材质A
+  plasticMaterial,    // 材质B
+  { 
+    friction: 0.1,    // 摩擦系数：0.1表示低摩擦（塑料在混凝土上易滑动）
+    restitution: 0.7  // 反弹系数：0.7表示中等弹性（碰撞后会反弹）
+  }
+);
+
+// 将规则添加到物理世界
+world.addContactMaterial(concretePlasticContactMaterial);
+```
+
+#### 3. 为物体绑定材质
+
+给物理实体（Body）指定材质，使其遵循预设的碰撞规则：
+
+```javascript
+// 球体绑定"塑料"材质
+const sphereBody = new CANNON.Body({
+  // ...其他属性
+  material: plasticMaterial, // 绑定材质
+});
+
+// 地面绑定"混凝土"材质
+const floorBody = new CANNON.Body();
+floorBody.material = concreteMaterial; // 绑定材质
+```
+
+#### 4. 实际效果
+
+当球体（塑料材质）与地面（混凝土材质）碰撞时：
+
+- 会应用 `friction: 0.1`：球体滚动时阻力小，能滑得更远
+- 会应用 `restitution: 0.7`：球体会有明显反弹（但不会完全弹回原高度）
+
+
+
+### 全局默认材质
+
+#### 1. 核心配置逻辑
+
+通过定义一个 "默认材质" 和对应的 "默认碰撞规则"，让所有未单独设置材质的物体自动遵循这套规则，省去为每个物体单独绑定材质的步骤。
+
+#### 2. 具体步骤
+
+##### （1）创建默认材质
+
+```javascript
+const defaultMaterial = new CANNON.Material("default"); // 通用材质
+```
+
+##### （2）创建默认碰撞规则
+
+定义该材质与自身碰撞时的物理特性（摩擦、反弹）：
+
+```javascript
+const defaultContactMaterial = new CANNON.ContactMaterial(
+  defaultMaterial,    // 材质A：默认材质
+  defaultMaterial,    // 材质B：默认材质（自身与自身碰撞）
+  { 
+    friction: 0.1,    // 全局默认摩擦系数
+    restitution: 0.7  // 全局默认反弹系数
+  }
+);
+```
+
+##### （3）设置为物理世界的默认规则
+
+```javascript
+world.addContactMaterial(defaultContactMaterial); // 添加到世界
+world.defaultContactMaterial = defaultContactMaterial; // 设为全局默认
+```
+
+##### （4）创建物体时无需单独绑定材质
+
+所有未指定`material`属性的物体，会自动使用全局默认材质和碰撞规则：
+
+```javascript
+// 球体和地面都未设置material，自动使用defaultMaterial
+const sphereBody = new CANNON.Body({ /* 未指定material */ });
+const floorBody = new CANNON.Body(); /* 未指定material */
+```
+
+------
+
+
+
+## 力与冲量方法详解
+
+### 1. 核心方法详解
+
+#### （1）`applyForce(force, worldPoint)`
+
+- **作用**：向物体施加一个**持续的力**（单位：牛顿），力的效果会随时间累积。
+
+- 参数：
+
+  - `force`：力的大小和方向（`CANNON.Vec3` 类型，如 `new CANNON.Vec3(10, 0, 0)` 表示沿 X 轴施加 10N 的力）。
+  - `worldPoint`：力的作用点（世界坐标系中的位置，`CANNON.Vec3` 类型）。若传入物体质心，则仅产生平动；若偏离质心，会同时产生旋转。
+
+- 示例：
+
+  ```javascript
+  // 向球体施加一个向右的持续力，作用点在球体质心
+  sphereBody.applyForce(
+    new CANNON.Vec3(5, 0, 0),  // 力的方向和大小
+    sphereBody.position        // 作用点（质心位置）
+  );
+  ```
+
+#### （2）`applyImpulse(impulse, worldPoint)`
+
+- **作用**：向物体施加一个**瞬时冲量**（单位：牛顿・秒），直接改变物体的动量（类似碰撞瞬间的冲击力）。
+
+- 参数：
+
+  - `impulse`：冲量的大小和方向（`CANNON.Vec3` 类型）。
+  - `worldPoint`：冲量的作用点（世界坐标系中的位置）。
+
+- **特点**：效果是瞬时的，不会随时间累积，适合模拟一次性的撞击（如踢球、击球）。
+
+- 示例：
+
+  ```javascript
+  // 给球体一个向右的瞬时冲量，使其立刻获得速度
+  sphereBody.applyImpulse(
+    new CANNON.Vec3(2, 0, 0),  // 冲量大小和方向
+    sphereBody.position        // 作用点（质心）
+  );
+  ```
+
+#### （3）`applyLocalForce(force, localPoint)`
+
+- **作用**：与 `applyForce` 类似，但力的作用点基于**物体自身的局部坐标系**（而非世界坐标系）。
+
+- 参数：
+
+  - `force`：力的大小和方向（局部坐标系下的 `CANNON.Vec3`）。
+  - `localPoint`：力的作用点（物体局部坐标系中的位置，如 `new CANNON.Vec3(0, 0.5, 0)` 表示物体顶部）。
+
+- **适用场景**：需要相对于物体自身方向施力时（如推进器固定在物体的某个局部位置）。
+
+- 示例：
+
+  ```javascript
+  // 从球体自身的右侧（局部坐标系 X 轴正方向）施加持续力
+  sphereBody.applyLocalForce(
+    new CANNON.Vec3(5, 0, 0),  // 局部 X 轴方向的力
+    new CANNON.Vec3(0.5, 0, 0) // 作用点：球体右侧边缘（局部坐标）
+  );
+  ```
+
+#### （4）`applyLocalImpulse(impulse, localPoint)`
+
+- **作用**：与 `applyImpulse` 类似，但冲量的作用点基于**物体自身的局部坐标系**。
+
+- 参数：
+
+  - `impulse`：冲量的大小和方向（局部坐标系下的 `CANNON.Vec3`）。
+  - `localPoint`：冲量的作用点（物体局部坐标系中的位置）。
+
+- **适用场景**：需要相对于物体自身方向施加瞬时冲击力时（如炮弹从物体的局部位置发射）。
+
+- 示例：
+
+  ```javascript
+  // 从球体自身的前方（局部 Z 轴正方向）施加瞬时冲量
+  sphereBody.applyLocalImpulse(
+    new CANNON.Vec3(0, 0, 3),  // 局部 Z 轴方向的冲量
+    new CANNON.Vec3(0, 0, 0.5) // 作用点：球体前端（局部坐标）
+  );
+  ```
+
+### 2. 关键区别总结
+
+| 方法                | 力 / 冲量类型 | 坐标系         | 核心特点                                   | 典型应用场景           |
+| ------------------- | ------------- | -------------- | ------------------------------------------ | ---------------------- |
+| `applyForce`        | 持续力        | 世界坐标系     | 效果随时间累积，适合持续推动               | 火箭推进、风力         |
+| `applyImpulse`      | 瞬时冲量      | 世界坐标系     | 效果瞬时生效，直接改变动量，适合一次性撞击 | 踢球、碰撞冲击         |
+| `applyLocalForce`   | 持续力        | 物体局部坐标系 | 相对于物体自身方向施力，适合固定位置推力   | 物体自带推进器         |
+| `applyLocalImpulse` | 瞬时冲量      | 物体局部坐标系 | 相对于物体自身方向施加瞬时力               | 从物体局部位置发射炮弹 |
+
+### 3. 使用注意事项
+
+- 若物体质量为 `0`（静止刚体，如地面 `floorBody`），施加力或冲量不会使其运动（符合物理规律）。
+- 作用点偏离质心时，物体不仅会平动，还会产生旋转（扭矩效应）。
+- 力和冲量的大小需要根据场景调试（过大会导致物体运动异常）。
+
+这四种施加力 / 冲量的方式（`applyForce`、`applyImpulse`、`applyLocalForce`、`applyLocalImpulse`）是否写在 `render` 循环中，取决于你想要的效果：
+
+- **如果需要持续施加力**（比如模拟持续的风力、推进器推力）：
+  必须写在 `render` 循环里，每帧调用一次，让力随时间累积。
+  类比：就像持续推箱子，需要一直用力才会持续加速。
+- **如果只需施加一次力**（比如碰撞瞬间的冲击、踢一脚球）：
+  不能写在 `render` 循环里，应该在特定事件中调用一次（比如点击按钮、检测到碰撞时）。
+  类比：踢足球只需踢一次，球就会持续运动，不需要一直踢。
+
+**示例代码结构**：
+
+```javascript
+function render() {
+  // 1. 持续力（每帧调用）
+  sphereBody.applyForce(
+    new CANNON.Vec3(0.1, 0, 0),  // 小力持续推
+    sphereBody.position
+  );
+
+  // 物理世界更新
+  world.step(1/60);
+  // 同步渲染...
+  requestAnimationFrame(render);
+}
+
+// 2. 瞬时力（事件触发时调用一次）
+document.addEventListener('click', () => {
+  sphereBody.applyImpulse(
+    new CANNON.Vec3(5, 0, 0),  // 一次大力冲击
+    sphereBody.position
+  );
+});
+```
+
+------
+
+## createSphere方法优化
+
+### 1. 解决 “几何体复用” 与 “尺寸多样化” 的矛盾
+
+代码中 `sphereGeometry` 是**全局复用的几何体**（`new THREE.SphereGeometry(1, 20, 20)`），其初始半径固定为 `1`。
+如果直接使用这个几何体创建不同大小的球体（如半径 `0.5` 或 `2`），不缩放的话所有模型都会是半径 `1` 的固定大小，无法实现尺寸多样化。
+通过 `scale.set(radius, radius, radius)` 可以基于初始几何体，按传入的 `radius` 比例缩放，快速不同尺寸的球体共享同一个几何体，既节省内存（避免重复创建几何体），又能灵活控制大小。
+
+### 2. 保证渲染模型与物理碰撞体尺寸一致
+
+Cannon.js 中创建碰撞体时直接使用 `new CANNON.Sphere(radius)`，其尺寸由参数 `radius` 决定。
+如果 Three.js 模型不做对应缩放（仍保持初始半径 `1`），会导致**渲染的视觉大小与物理碰撞检测的尺寸不匹配**（例如：视觉上是小球，物理上却按大球碰撞）。
+通过缩放模型，确保 `渲染尺寸 = 物理碰撞尺寸 = radius`，两者完全同步。
+
+### 举例说明
+
+- 当调用 `createSphere(0.5, ...)` 时：
+  - Cannon 碰撞体：半径 `0.5`（物理碰撞物理碰撞按此尺寸计算）。
+  - Three.js 模型：初始几何体半径 `1` → 缩放 `0.5` 倍 → 最终视觉半径 `0.5`（与物理尺寸一致）。
+- 若不缩放，会出现：视觉上是半径 `1` 的大球，物理上却按半径 `0.5` 检测碰撞，导致 “穿模” 或 “碰撞判定异常”。
+
+------
+
+## 为什么必须同步旋转（`quaternion.set`）
+
+立方体只会弹跳、不会倒下的问题，根源是**未同步物理旋转到视觉模型**：
+
+1. **物理引擎已计算旋转，但视觉未更新**
+   Cannon.js 中，立方体碰撞后会自然计算旋转（如被撞击后倾倒），但默认不会影响 Three.js 模型的视觉旋转。如果只同步位置（`position`）而不同步旋转（`quaternion`），就会出现 “物理上已倒下，视觉上仍直立” 的矛盾。
+
+2. **旋转同步的关键代码**
+   在渲染循环中添加：
+
+   ```typescript
+   function render() {
+     // ... 省略滚动位置更新代码 ...
+     const deltaTime = clock.getDelta();
+     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
+     
+     // 更新物理世界
+     world.step(1 / 60, deltaTime, 3);
+   
+     // 同步位置（已有的代码）
+     element.mesh.position.set(
+       element.body.position.x,
+       element.body.position.y,
+       element.body.position.z
+     );
+     
+     // 新增：同步旋转（解决立方体不倒下的问题）
+     element.mesh.quaternion.set(
+       element.body.quaternion.x,
+       element.body.quaternion.y,
+       element.body.quaternion.z,
+       element.body.w
+     );
+     // ... 省略滚动位置更新代码 ...
+   }
+   ```
+
+3. **实际效果**
+   同步旋转后，立方体碰撞时会：
+
+   - 受撞击力影响产生旋转（物理计算）
+   - 视觉上实时显示倾倒、翻滚状态（与物理完全匹配）
+   - 后续碰撞会基于当前旋转状态计算（如侧面撞击时更易翻滚）
+
+------
+
+## 声音效果ai优化版本
+
+```typescript
+/**
+ * Sounds
+ */
+// const hitSound = new Audio(
+// new URL("../assets/sounds/hit.mp3", import.meta.url).href
+// );
+// const playHitSound = (collision) => {
+// const impactStrength = collision.contact.getImpactVelocityAlongNormal();
+// if (impactStrength < 1.5) return;
+// hitSound.volume = Math.random();
+// hitSound.currentTime = 0;
+// hitSound.play();
+// };
+// 1. 使用AudioBufferSourceNode替代Audio元素，提供更好的音效控制和多实例播放
+/**
+ * audioContext：Web Audio API 的核心对象，相当于一个 “音频处理工厂”，所有音频操作（播放、音量调整等）都需要通过它创建。
+ * 全局只需要一个实例，所以定义为外部变量复用。
+ * hitSoundBuffer：存储解码后的音频数据（二进制缓冲区）。
+ * 音频文件加载后解码一次，后续播放时直接复用这个缓冲区，避免重复加载和解码，提升性能。
+ */
+let audioContext: AudioContext | null = null;
+let hitSoundBuffer: AudioBuffer | null = null;
+
+// 预加载音效（建议在初始化阶段调用）
+const loadHitSound = async (): Promise<void> => {
+  try {
+    // 初始化AudioContext（处理浏览器兼容性和类型）
+    if (!audioContext) {
+      const AudioContextConstructor =
+        audioContext ||
+        window.AudioContext ||
+        (window as any).webkitAudioContext;
+      if (AudioContextConstructor) {
+        audioContext = new AudioContextConstructor();
+      } else {
+        throw new Error("Web Audio API is not supported in this browser");
+      }
+    }
+
+    // 加载并解码音频文件
+    const response = await fetch(
+      new URL("../assets/sounds/hit.mp3", import.meta.url).href
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sound: ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    hitSoundBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    console.log("碰撞音效加载完成");
+  } catch (error) {
+    console.error("音效加载失败:", error);
+  }
+};
+
+// 定义碰撞参数的类型接口
+interface Collision {
+  contact: {
+    getImpactVelocityAlongNormal: () => number;
+  };
+}
+
+// 播放碰撞音效的优化版本
+const playHitSound = (collision: Collision): void => {
+  // 检查音效是否加载完成
+  if (!audioContext || !hitSoundBuffer) return;
+
+  // 计算碰撞强度（限制最大值，避免音量异常）
+  /**
+   * 作用：将碰撞强度（可能很大）压缩到 0~1 的范围，方便映射到音量等参数。
+   * 原理：
+   * impactStrength / 10：假设碰撞强度最大值可能达到 10，除以 10 后将其缩放到 0~1 范围。
+   * Math.min(..., 1)：防止碰撞强度超过 10 时，结果大于 1（确保最大值为 1）。
+   * 举例：若碰撞强度是 15，计算后为 15/10=1.5，再被 Math.min 限制为 1，避免音量过大。
+   */
+  const impactStrength = collision.contact.getImpactVelocityAlongNormal();
+  const normalizedStrength = Math.min(impactStrength / 10, 1); // 归一化到0-1范围
+
+  // 只播放足够强度的碰撞音效
+  if (normalizedStrength < 0.15) return;
+
+  try {
+    // 创建新的音频源（支持同时播放多个音效）
+    /**
+     * BufferSource 作用：它是 “音频源节点”，用于播放 hitSoundBuffer 中的音频数据。
+     * 为什么能多实例播放：
+     * 每个 BufferSource 都是独立的播放实例，就像多个独立的 “播放器”。如果只用一个实例，再次播放时会中断上一次播放（比如连续碰撞时，后一次碰撞会打断前一次音效）。
+     * 而创建新的 source 实例，就能同时播放多个音效（比如快速连续碰撞时，音效会叠加）。
+     */
+    const source = audioContext.createBufferSource();
+    source.buffer = hitSoundBuffer;
+
+    // 创建音量控制节点，根据碰撞强度调整音量
+    /**
+     * const gainNode = audioContext.createGain();
+     * 作用：创建 “音量控制节点”，专门用于调整音频的音量（gain 意为 “增益”，即音量倍数）。
+     * 如何控制音量：通过 gainNode.gain.value 设置，0 为静音，1 为原音量，大于 1 会放大（可能失真）。
+     */
+    const gainNode = audioContext.createGain();
+    gainNode.gain.value = 0.3 + normalizedStrength * 0.7; // 音量范围0.3-1.0
+
+    // 连接音频节点并播放
+    /**
+     * Web Audio API 的 “节点连接” 模型：音频处理像一条 “流水线”，数据从一个节点流向另一个节点，最终输出到扬声器。
+     * source.connect(gainNode)：将音频源的输出连接到音量节点，让音频先经过音量调整。
+     * gainNode.connect(...)：将音量节点的输出连接到 “最终目的地”（destination 代表扬声器 / 耳机）。
+     * source.start(0)：启动音频源，从时间 0 开始播放（立即播放）。
+     */
+    source.connect(gainNode); // 1. 音频源 → 音量节点
+    gainNode.connect(audioContext.destination); // 2. 音量节点 → 输出设备
+    source.start(0); // 3. 开始播放
+  } catch (error) {
+    console.error("音效播放失败:", error);
+  }
+};
+
+// 3. 初始化时预加载音效（建议在用户首次交互后调用，如点击事件）
+document.addEventListener("click", loadHitSound, { once: true });
+```
+
+------
+
+
+
+## Cannon.js 核心属性与方法速查表
+
+### 一、世界（World）核心
+
+物理世界是所有物理对象的容器，负责统一调度物理模拟、管理刚体与碰撞规则，是 Cannon.js 运行的基础环境。
+
+| 属性 / 方法                                    | 作用                                                         | 示例                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `new CANNON.World()`                           | 创建物理世界实例，初始化物理模拟上下文                       | `const world = new CANNON.World();`                          |
+| `gravity`                                      | 设置全局重力加速度（`CANNON.Vec3` 类型），默认值为 `(0, -9.82, 0)`（模拟地球重力） | `world.gravity.set(0, -10, 0);`                              |
+| `step(dt, timeSinceLastCalled?, maxSubSteps?)` | 推进物理模拟（核心方法，需在渲染循环中调用） - `dt`：固定时间步长（推荐 `1/60`，对应 60fps） - `timeSinceLastCalled`：距上次调用的实际时间（可选，用于补偿帧率波动） - `maxSubSteps`：最大子步数（可选，防止单次模拟时间过长导致卡顿） | `// 渲染循环中调用` `function update() {` `world.step(1/60);` `requestAnimationFrame(update);` `}` |
+| `addBody(body)`                                | 向物理世界添加刚体（动态 / 静态物体）                        | `world.addBody(sphereBody);`                                 |
+| `removeBody(body)`                             | 从物理世界移除刚体，释放资源                                 | `world.removeBody(obstacleBody);`                            |
+| `addContactMaterial(cm)`                       | 添加两种材质的碰撞规则（`ContactMaterial` 实例），定义摩擦、反弹等交互特性 | `world.addContactMaterial(concretePlasticCM);`               |
+| `defaultContactMaterial`                       | 设置全局默认碰撞材质，当两个刚体无匹配的 `ContactMaterial` 时生效 | `world.defaultContactMaterial = new CANNON.ContactMaterial(m1, m1, { friction: 0.3 });` |
+
+### 二、刚体（Body）核心
+
+代表物理世界中的可交互物体，分为动态刚体（`mass > 0`，受重力和力的影响）和静态刚体（`mass = 0`，固定不动，如地面）。
+
+| 属性 / 方法                              | 作用                                                         | 示例                                                         |
+| ---------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `new CANNON.Body(options)`               | 创建刚体实例，`options` 为配置对象 常用配置： - `mass`：质量（`0` 为静态） - `position`：初始位置（`CANNON.Vec3`） - `shape`：碰撞形状 - `material`：绑定的材质 | `const sphereBody = new CANNON.Body({` `mass: 1,` `position: new CANNON.Vec3(0, 5, 0),` `shape: new CANNON.Sphere(0.5),` `material: plasticMaterial` `});` |
+| `mass`                                   | 刚体质量（数值类型），`0` 表示静态刚体，`>0` 表示动态刚体    | `floorBody.mass = 0; // 地面设为静态`                        |
+| `position`                               | 刚体位置（`CANNON.Vec3` 类型），控制物体在世界中的坐标       | `sphereBody.position.set(2, 3, 1);`                          |
+| `quaternion`                             | 刚体旋转（`CANNON.Quaternion` 类型），用于描述物体朝向，避免欧拉角万向锁问题 | `// 绕 X 轴旋转 90 度（弧度）` `floorBody.quaternion.setFromAxisAngle(` `new CANNON.Vec3(-1, 0, 0), Math.PI / 2` `);` |
+| `velocity`                               | 线速度（`CANNON.Vec3` 类型），直接控制物体的平动速度         | `sphereBody.velocity.set(0, 2, 0); // 向上运动`              |
+| `angularVelocity`                        | 角速度（`CANNON.Vec3` 类型），控制物体的旋转速度             | `sphereBody.angularVelocity.set(1, 0, 0); // 绕 X 轴旋转`    |
+| `material`                               | 绑定的材质（`CANNON.Material` 实例），用于碰撞规则匹配       | `cubeBody.material = metalMaterial;`                         |
+| `addShape(shape)`                        | 为刚体添加碰撞形状（单个刚体可添加多个形状，组合成复杂碰撞边界） | `// 为立方体添加盒子形状` `cubeBody.addShape(new CANNON.Box(new CANNON.Vec3(1,1,1)));` |
+| `applyForce(force, worldPoint)`          | 施加持续力（世界坐标系） - `force`：力的大小和方向（`CANNON.Vec3`） - `worldPoint`：力的作用点（世界坐标，`CANNON.Vec3`） | `// 向球体质心施加向右的力` `sphereBody.applyForce(` `new CANNON.Vec3(5, 0, 0), sphereBody.position` `);` |
+| `applyImpulse(impulse, worldPoint)`      | 施加瞬时冲量（世界坐标系），直接改变动量，适合模拟碰撞、撞击 | `// 给球体施加向右的瞬时冲量` `sphereBody.applyImpulse(` `new CANNON.Vec3(2, 0, 0), sphereBody.position` `);` |
+| `applyLocalForce(force, localPoint)`     | 施加持续力（物体局部坐标系），力的方向随物体旋转同步变化     | `// 向球体自身前方施加力` `sphereBody.applyLocalForce(` `new CANNON.Vec3(0, 0, 3), new CANNON.Vec3(0, 0, 0.5)` `);` |
+| `applyLocalImpulse(impulse, localPoint)` | 施加瞬时冲量（物体局部坐标系），冲量方向相对物体固定         | `// 从球体自身顶部施加向上冲量` `sphereBody.applyLocalImpulse(` `new CANNON.Vec3(0, 5, 0), new CANNON.Vec3(0, 0.5, 0)` `);` |
+
+### 三、碰撞形状（Shape）
+
+定义刚体的碰撞边界，决定碰撞检测的范围和精度，不同形状对应不同的物理模拟性能与适用场景。
+
+| 形状类                                                       | 作用                                                         | 示例                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `CANNON.Sphere(radius)`                                      | 球体形状，适合圆形物体（如球、珠子），模拟效率最高           | `new CANNON.Sphere(0.5); // 半径 0.5 的球体`                 |
+| `CANNON.Plane()`                                             | 无限大平面形状，适合地面、墙面等无限延伸的边界               | `new CANNON.Plane(); // 默认垂直平面，需旋转为水平`          |
+| `CANNON.Box(halfExtents)`                                    | 立方体形状，适合方形物体（如箱子、砖块） - `halfExtents`：半边长向量（`CANNON.Vec3`），实际边长为该值的 2 倍 | `// 边长为 2x2x2 的立方体` `new CANNON.Box(new CANNON.Vec3(1, 1, 1));` |
+| `CANNON.Cylinder(radiusTop, radiusBottom, height, segments?)` | 圆柱体形状，适合圆柱物体（如柱子、易拉罐） - `segments`：径向分段数（可选，默认 8，数值越高越接近圆形） | `// 顶面半径 0.3、底面半径 0.3、高 2 的圆柱体` `new CANNON.Cylinder(0.3, 0.3, 2);` |
+| `CANNON.ConvexPolyhedron(vertices, faces)`                   | 凸多面体形状，适合自定义规则凸形物体（如金字塔、四面体） - `vertices`：顶点数组（`CANNON.Vec3[]`） - `faces`：面数组（每个面为顶点索引数组） | `// 正四面体（简化示例）` `const vertices = [new CANNON.Vec3(0,1,0), ...];` `const faces = [[0,1,2], [0,2,3], ...];` `new CANNON.ConvexPolyhedron(vertices, faces);` |
+
+### 四、向量（Vec3）与四元数（Quaternion）
+
+#### 4.1 Vec3（三维向量）
+
+用于表示位置、方向、力、速度等三维物理量，是 Cannon.js 中最基础的数据结构之一。
+
+| 方法                       | 作用                                          | 示例                                                         |
+| -------------------------- | --------------------------------------------- | ------------------------------------------------------------ |
+| `new CANNON.Vec3(x, y, z)` | 创建三维向量实例，`x/y/z` 为坐标分量          | `new CANNON.Vec3(0, 5, 0);`                                  |
+| `set(x, y, z)`             | 设置向量的三个分量值                          | `const pos = new CANNON.Vec3(); pos.set(2, 3, 1);`           |
+| `add(v)`                   | 与另一个向量相加（返回新向量，不修改原向量）  | `const v1 = new CANNON.Vec3(1,2,3);` `const v2 = new CANNON.Vec3(4,5,6);` `const v3 = v1.add(v2); // v3 = (5,7,9)` |
+| `sub(v)`                   | 与另一个向量相减（返回新向量）                | `const v3 = v1.sub(v2); // v3 = (-3,-3,-3)`                  |
+| `multiplyScalar(s)`        | 向量与标量相乘（放大 / 缩小向量，返回新向量） | `const v2 = v1.multiplyScalar(2); // v2 = (2,4,6)`           |
+| `copy(v)`                  | 复制另一个向量的分量值到当前向量              | `const v2 = new CANNON.Vec3(); v2.copy(v1);`                 |
+
+#### 4.2 Quaternion（四元数）
+
+用于精确描述物体的三维旋转，避免欧拉角的 “万向锁” 问题，是 Cannon.js 中旋转表示的标准方式。
+
+| 方法                                | 作用                                                         | 示例                                                         |
+| ----------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `new CANNON.Quaternion(x, y, z, w)` | 创建四元数实例（`x/y/z/w` 为四元数分量，一般不直接手动设置） | `new CANNON.Quaternion(0, 0, 0, 1); // 初始无旋转`           |
+| `setFromAxisAngle(axis, angle)`     | 从 “旋转轴 + 角度” 创建四元数 - `axis`：旋转轴（`CANNON.Vec3`） - `angle`：旋转角度（弧度） | `// 绕 Y 轴旋转 45 度` `new CANNON.Quaternion().setFromAxisAngle(` `new CANNON.Vec3(0,1,0), Math.PI/4` `);` |
+| `setFromEuler(x, y, z)`             | 从欧拉角创建四元数（绕 X/Y/Z 轴的旋转角度，弧度）            | `// 绕 X 轴 30 度，绕 Y 轴 60 度` `quat.setFromEuler(Math.PI/6, Math.PI/3, 0);` |
+| `copy(q)`                           | 复制另一个四元数的分量值                                     | `const q2 = new CANNON.Quaternion(); q2.copy(q1);`           |
+
+### 五、材质与碰撞规则
+
+控制物体碰撞时的物理特性（摩擦、反弹），通过 “材质定义 + 碰撞规则匹配” 实现差异化交互。
+
+| 类 / 属性 / 方法                              | 作用                                                         | 示例                                                         |
+| --------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `new CANNON.Material(name)`                   | 创建材质实例，`name` 为标识名称（仅用于调试和区分）          | `const concreteMaterial = new CANNON.Material("concrete");`  |
+| `new CANNON.ContactMaterial(m1, m2, options)` | 定义两种材质的碰撞规则 - `m1/m2`：参与碰撞的两种材质 - `options`：配置对象，包含 `friction`（摩擦系数）和 `restitution`（反弹系数） | `const concretePlasticCM = new CANNON.ContactMaterial(` `concreteMaterial, plasticMaterial,` `{ friction: 0.1, restitution: 0.7 }` `);` |
+| `friction`                                    | 摩擦系数（数值类型，范围 `0~1`） - `0`：无摩擦（物体滑动无阻力） - `1`：高摩擦（物体易静止） | `{ friction: 0.3 } // 中等摩擦`                              |
+| `restitution`                                 | 反弹系数（数值类型，范围 `0~1`） - `0`：完全非弹性（碰撞后不反弹） - `1`：完全弹性（碰撞后反弹高度与原高度一致） | `{ restitution: 0.5 } // 中等反弹`                           |
+
+### 六、碰撞事件
+
+监听刚体的碰撞行为，用于触发音效、特效、逻辑判断等交互反馈。
+
+| 事件 / 属性                                  | 作用                                                     | 示例                                                         |
+| -------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------ |
+| `body.addEventListener('collide', callback)` | 为刚体添加碰撞事件监听器，碰撞发生时触发 `callback`      | `sphereBody.addEventListener('collide', handleCollision);`   |
+| `event.contact`                              | 碰撞事件对象中的 “接触信息”，包含碰撞点、强度等数据      | `// 获取碰撞强度` `const impact = event.contact.getImpactVelocityAlongNormal();` |
+| `event.other`                                | 碰撞事件对象中的 “另一刚体”，即与当前刚体碰撞的物体      | `// 检测是否与地面碰撞` `if (event.other === floorBody) { ... }` |
+| `contact.getImpactVelocityAlongNormal()`     | 获取碰撞强度（沿法线方向的冲击速度），数值越大碰撞越剧烈 | `// 碰撞强度大于 1.5 时触发音效` `if (event.contact.getImpactVelocityAlongNormal() > 1.5) {` `playHitSound();` `}` |
+
+### 七、基础示例：完整物理模拟流程
+
+```javascript
+// 1. 创建物理世界
+const world = new CANNON.World();
+world.gravity.set(0, -9.82, 0); // 设置重力
+
+// 2. 定义材质与碰撞规则
+const defaultMaterial = new CANNON.Material("default");
+const defaultCM = new CANNON.ContactMaterial(
+  defaultMaterial, defaultMaterial,
+  { friction: 0.1, restitution: 0.7 }
+);
+world.addContactMaterial(defaultCM);
+world.defaultContactMaterial = defaultCM;
+
+// 3. 创建地面（静态刚体）
+const floorBody = new CANNON.Body({ mass: 0, material: defaultMaterial });
+floorBody.addShape(new CANNON.Plane());
+floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(-1, 0, 0), Math.PI / 2);
+world.addBody(floorBody);
+
+// 4. 创建球体（动态刚体）
+const sphereBody = new CANNON.Body({
+  mass: 1,
+  position: new CANNON.Vec3(0, 5, 0),
+  shape: new CANNON.Sphere(0.5),
+  material: defaultMaterial
+});
+world.addBody(sphereBody);
+
+// 5. 监听碰撞事件
+sphereBody.addEventListener('collide', (event) => {
+  const impact = event.contact.getImpactVelocityAlongNormal();
+  if (impact > 1.5) console.log("碰撞强度:", impact);
+});
+
+// 6. 渲染循环（同步物理与渲染）
+function update() {
+  world.step(1/60); // 推进物理模拟
+  // 同步 Three.js 网格位置（示例）
+  // mesh.position.copy(new THREE.Vector3(sphereBody.position.x, ...));
+  requestAnimationFrame(update);
+}
+update();
+```
+
+------
+
+
+
+
 
 # dat.GUI API
 

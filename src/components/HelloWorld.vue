@@ -19,20 +19,6 @@ import * as CANNON from "cannon-es";
 // 使用FontLoader加载字体
 const fontLoader = new FontLoader();
 
-/**
- * Sounds
- */
-const hitSound = new Audio(
-  new URL("../assets/sounds/hit.mp3", import.meta.url).href
-);
-const playHitSound = (collision) => {
-  const impactStrength = collision.contact.getImpactVelocityAlongNormal();
-  if (impactStrength < 1.5) return;
-  hitSound.volume = Math.random();
-  hitSound.currentTime = 0;
-  hitSound.play();
-};
-
 // 使用TextureLoader加载纹理
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onStart = () => {
@@ -53,42 +39,14 @@ loadingManager.onError = (url) => {
 const texturesLoader = new THREE.TextureLoader(loadingManager);
 const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
 // 加载纹理
-const environmentMapTexture = cubeTextureLoader.load([
-  getTextureUrl("environmentMaps/0/px.jpg"),
-  getTextureUrl("environmentMaps/0/nx.jpg"),
-  getTextureUrl("environmentMaps/0/py.jpg"),
-  getTextureUrl("environmentMaps/0/ny.jpg"),
-  getTextureUrl("environmentMaps/0/pz.jpg"),
-  getTextureUrl("environmentMaps/0/nz.jpg"),
-]);
-
-/**
- * Physics
- */
-// World
-const world = new CANNON.World();
-world.broadphase = new CANNON.SAPBroadphase(world);
-world.allowSleep = true;
-world.gravity.set(0, -9.82, 0);
-
-// Materials
-const defaultMaterial = new CANNON.Material("default");
-
-const defaultContactMaterial = new CANNON.ContactMaterial(
-  defaultMaterial,
-  defaultMaterial,
-  { friction: 0.1, restitution: 0.7 }
-);
-world.addContactMaterial(defaultContactMaterial);
-world.defaultContactMaterial = defaultContactMaterial;
-
-// Floor
-const floorShape = new CANNON.Plane();
-const floorBody = new CANNON.Body();
-floorBody.mass = 0;
-floorBody.addShape(floorShape);
-floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(-1, 0, 0), Math.PI / 2);
-world.addBody(floorBody);
+// const environmentMapTexture = cubeTextureLoader.load([
+// getTextureUrl("environmentMaps/0/px.jpg"),
+// getTextureUrl("environmentMaps/0/nx.jpg"),
+// getTextureUrl("environmentMaps/0/py.jpg"),
+// getTextureUrl("environmentMaps/0/ny.jpg"),
+// getTextureUrl("environmentMaps/0/pz.jpg"),
+// getTextureUrl("environmentMaps/0/nz.jpg"),
+// ]);
 
 const sizes = {
   width: 800,
@@ -163,10 +121,9 @@ onMounted(() => {
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(10, 10),
     new THREE.MeshStandardMaterial({
-      color: "#777777",
-      metalness: 0.3,
-      roughness: 0.4,
-      envMap: environmentMapTexture,
+      color: "#444444",
+      metalness: 0,
+      roughness: 0.5,
     })
   );
   floor.receiveShadow = true;
@@ -176,10 +133,10 @@ onMounted(() => {
   /**
    * Lights
    */
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
   scene.add(ambientLight);
 
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.2);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
   directionalLight.castShadow = true;
   directionalLight.shadow.mapSize.set(1024, 1024);
   directionalLight.shadow.camera.far = 15;
@@ -205,133 +162,29 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(-3, 3, 3);
+  camera.position.set(2, 2, 2);
   scene.add(camera);
 
   // Controls
   controls = new OrbitControls(camera, webgl.value);
+  controls.target.set(0, 0.75, 0);
   controls.enableDamping = true;
 
   // 创建渲染器对象
   renderer = new THREE.WebGLRenderer();
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   // renderer.setClearColor(new THREE.Color("#262837")); //设置渲染器的背景颜色
   webgl.value!.appendChild(renderer.domElement);
 
-  /**
-   * Utils
-   */
-  // 定义位置接口，包含x、y、z属性
-  interface Position {
-    x: number;
-    y: number;
-    z: number;
-  }
-
-  // 定义更新对象的类型接口
-  interface UpdateObject {
-    mesh: THREE.Mesh;
-    body: CANNON.Body;
-  }
-
-  // 明确指定数组类型
-  const objectsToUpdate: UpdateObject[] = [];
-  const sphereGeometry = new THREE.SphereGeometry(1, 20, 20);
-  const sphereMaterial = new THREE.MeshStandardMaterial({
-    metalness: 0.3,
-    roughness: 0.4,
-    envMap: environmentMapTexture,
-  });
-  const createSphere = (radius: number, position: Position): void => {
-    // Three.js mesh
-    const mesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
-    mesh.scale.set(radius, radius, radius);
-    mesh.castShadow = true;
-    // 设置Three.js网格位置
-    mesh.position.set(position.x, position.y, position.z);
-    scene.add(mesh);
-
-    // Cannon.js body
-    const shape = new CANNON.Sphere(radius);
-    const body = new CANNON.Body({
-      mass: 1,
-      position: new CANNON.Vec3(position.x, position.y, position.z),
-      shape,
-      material: defaultMaterial,
-    });
-    body.addEventListener("collide", playHitSound);
-    world.addBody(body);
-
-    // 创建并返回更新对象
-    const updateObject = { mesh, body };
-    objectsToUpdate.push(updateObject);
-  };
-
-  createSphere(0.5, { x: 0, y: 3, z: 0 });
-
-  const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-  const boxMaterial = new THREE.MeshStandardMaterial({
-    metalness: 0.3,
-    roughness: 0.4,
-    envMap: environmentMapTexture,
-  });
-  const createBox = (
-    width: number,
-    height: number,
-    depth: number,
-    position: Position
-  ): void => {
-    // Three.js mesh
-    const mesh = new THREE.Mesh(boxGeometry, boxMaterial);
-    mesh.scale.set(width, height, depth);
-    mesh.castShadow = true;
-    // 设置Three.js网格位置
-    mesh.position.set(position.x, position.y, position.z);
-    scene.add(mesh);
-
-    // Cannon.js body
-    const shape = new CANNON.Box(
-      new CANNON.Vec3(width / 2, height / 2, depth / 2)
-    );
-    const body = new CANNON.Body({
-      mass: 1,
-      position: new CANNON.Vec3(position.x, position.y, position.z),
-      shape,
-      material: defaultMaterial,
-    });
-    body.addEventListener("collide", playHitSound);
-    world.addBody(body);
-
-    // 创建并返回更新对象
-    const updateObject = { mesh, body };
-    objectsToUpdate.push(updateObject);
-  };
-
   const clock = new THREE.Clock(); //创建一个时钟对象，用于计算时间差
-  let old = 0;
   function render() {
-    if (!camera || !renderer || !controls || !world) return;
+    if (!camera || !renderer || !controls) return;
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
-
-    // Update physics world
-    world.step(1 / 60, deltaTime, 3);
-
-    objectsToUpdate.forEach((element) => {
-      element.mesh.position.set(
-        element.body.position.x,
-        element.body.position.y,
-        element.body.position.z
-      );
-      element.mesh.quaternion.set(
-        element.body.quaternion.x,
-        element.body.quaternion.y,
-        element.body.quaternion.z,
-        element.body.quaternion.w
-      );
-    });
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -349,36 +202,6 @@ onMounted(() => {
 
   // 创建GUI===================
   gui = new GUI();
-  const debugObject = {
-    createSphere: () => {
-      createSphere(Math.random() * 0.5, {
-        x: Math.random() * 3,
-        y: 3,
-        z: Math.random() * 3,
-      });
-    },
-    createBox: () => {
-      createBox(Math.random(), Math.random(), Math.random(), {
-        x: (Math.random() - 0.5) * 3,
-        y: 3,
-        z: (Math.random() - 0.5) * 3,
-      });
-    },
-    reset: () => {
-      objectsToUpdate.forEach((element) => {
-        // Remove body
-        element.body.removeEventListener("collide", playHitSound);
-        world.removeBody(element.body);
-        //Remove mesh
-        scene.remove(element.mesh);
-      });
-
-      objectsToUpdate.splice(0, objectsToUpdate.length);
-    },
-  };
-  gui.add(debugObject, "createSphere");
-  gui.add(debugObject, "createBox");
-  gui.add(debugObject, "reset");
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

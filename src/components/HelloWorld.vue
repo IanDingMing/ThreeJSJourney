@@ -10,9 +10,6 @@ import { GUI } from "three/addons/libs/lil-gui.module.min.js";
 import { FontLoader } from "three/addons/loaders/FontLoader.js";
 // 导入文本几何体
 import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
-// GLTF加载器
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 // 导入自定义的纹理工具函数
 import { getTextureUrl } from "@/utils/texturesUtils";
 // 导入RectAreaLightHelper
@@ -107,7 +104,6 @@ const handleDoubleClick = () => {
   }
 };
 
-let mixer: THREE.AnimationMixer | null = null;
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
@@ -118,93 +114,28 @@ onMounted(() => {
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 模型mesh==========================
+
   /**
-   * Models
+   * Objects
    */
-  const dracoLoader = new DRACOLoader();
-  dracoLoader.setDecoderPath(`${import.meta.env.BASE_URL}draco/`);
+  const object1 = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 16, 16),
+    new THREE.MeshBasicMaterial({ color: "#ff0000" })
+  );
+  object1.position.x = -2;
 
-  const gltfLoader = new GLTFLoader();
-  gltfLoader.setDRACOLoader(dracoLoader);
-
-  const duckPath = `${import.meta.env.BASE_URL}models/Duck/glTF/Duck.gltf`;
-  const duckPathBinary = `${
-    import.meta.env.BASE_URL
-  }models/Duck/glTF-Binary/Duck.glb`;
-  const duckPathDraco = `${
-    import.meta.env.BASE_URL
-  }models/Duck/glTF-Draco/Duck.gltf`;
-  const duckPathEmbedded = `${
-    import.meta.env.BASE_URL
-  }models/Duck/glTF-Embedded/Duck.gltf`;
-  const flightHelmetPath = `${
-    import.meta.env.BASE_URL
-  }models/FlightHelmet/glTF/FlightHelmet.gltf`;
-  const foxPath = `${import.meta.env.BASE_URL}models/Fox/glTF/Fox.gltf`;
-  // Load a glTF resource
-  gltfLoader.load(
-    // resource URL
-    foxPath,
-    // called when the resource is loaded
-    function (gltf) {
-      console.log(gltf);
-
-      mixer = new THREE.AnimationMixer(gltf.scene);
-      const action = mixer.clipAction(gltf.animations[2]);
-      action.play();
-
-      gltf.scene.scale.set(0.025, 0.025, 0.025);
-      scene.add(gltf.scene);
-      // scene.add(gltf.scene.children[0]);
-
-      gltf.animations; // Array<THREE.AnimationClip> 模型包含的动画片段数组（如骨骼动画、形变动画）。
-      gltf.scene; // THREE.Group 模型的主场景对象（THREE.Group），包含所有可视元素（网格、灯光等）的层级结构。
-      gltf.scene.children; //主场景的直接子元素数组（可能是网格、子组等）。
-      gltf.scenes; // Array<THREE.Group> 模型中所有场景的数组（glTF 支持多场景，通常只有一个）。
-      gltf.cameras; // Array<THREE.Camera> 模型自带的相机数组（可能为空，需手动添加到场景才生效）。
-      gltf.asset; // Object 模型的元数据（如 glTF 版本、生成工具等信息）。
-    },
-    // called while loading is progressing
-    function (xhr) {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    // called when loading has errors
-    function (error) {
-      console.log("An error happened", error);
-    }
+  const object2 = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 16, 16),
+    new THREE.MeshBasicMaterial({ color: "#ff0000" })
   );
 
-  /**
-   * Floor
-   */
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, 10),
-    new THREE.MeshStandardMaterial({
-      color: "#444444",
-      metalness: 0,
-      roughness: 0.5,
-    })
+  const object3 = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 16, 16),
+    new THREE.MeshBasicMaterial({ color: "#ff0000" })
   );
-  floor.receiveShadow = true;
-  floor.rotation.x = -Math.PI * 0.5;
-  scene.add(floor);
+  object3.position.x = 2;
 
-  /**
-   * Lights
-   */
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-  scene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-  directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.set(1024, 1024);
-  directionalLight.shadow.camera.far = 15;
-  directionalLight.shadow.camera.left = -7;
-  directionalLight.shadow.camera.top = 7;
-  directionalLight.shadow.camera.right = 7;
-  directionalLight.shadow.camera.bottom = -7;
-  directionalLight.position.set(5, 5, 5);
-  scene.add(directionalLight);
+  scene.add(object1, object2, object3);
 
   // 模型mesh==========================
 
@@ -221,7 +152,7 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(2, 2, 2);
+  camera.position.z = 3;
   scene.add(camera);
 
   // Controls
@@ -244,11 +175,6 @@ onMounted(() => {
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
-
-    // 更新mixer
-    if (mixer) {
-      mixer.update(deltaTime);
-    }
 
     // Animate meshes
     meshArray.forEach((mesh) => {});

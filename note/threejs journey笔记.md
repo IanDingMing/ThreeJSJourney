@@ -2538,6 +2538,220 @@ render();
 
 
 
+## P24 Raycaster and Mouse Events
+
+### 1. Raycaster 基础概念
+
+#### 创建射线
+
+```javascript
+const raycaster = new THREE.Raycaster();
+const rayOrgin = new THREE.Vector3(-3, 0, 0);
+const rayDirection = new THREE.Vector3(10, 0, 0);
+rayDirection.normalize(); // 归一化很重要
+
+raycaster.set(rayOrgin, rayDirection);
+```
+
+#### raycaster.set() 方法解析
+
+- **作用**：设置射线的起点和方向
+- **参数**：
+  - `origin`：射线起点（Vector3）
+  - `direction`：射线方向（Vector3）
+
+#### 为什么需要归一化 rayDirection？
+
+- **归一化**：将向量转换为单位向量（长度为1）
+- **原因**：
+  - 射线检测算法基于单位向量计算交点
+  - 确保距离计算准确
+  - 使方向向量的分量范围在 -1 到 1 之间
+
+#### intersect 对象属性解析
+
+```javascript
+{
+  distance: 2.5,           // 射线起点到相交点的距离（数值越小，物体越靠前）
+  face: {                  // 相交的物体表面（包含顶点索引、法向量等）
+    a: 136, b: 153, c: 154, // 面的顶点索引
+    normal: Vector3,       // 面的法向量
+    materialIndex: 0       // 材质索引
+  },
+  faceIndex: 241,          // 面的索引
+  object: Mesh,            // 与射线相交的 3D 对象（如 Mesh）
+  point: Vector3,          // 相交点在 3D 世界中的坐标（Vector3）
+  uv: Vector2              // 相交点在物体纹理上的 UV 坐标（用于纹理交互）
+}
+```
+
+### 2. 射线与模型交互
+
+#### 基本交互实现
+
+```javascript
+function render() {
+  // ... 其他代码
+  // 重置所有物体颜色
+	objectToTest.forEach((object) => {
+	  object.material.color.set("#ff0000");
+	});
+
+	// 设置相交物体颜色
+	intersects.forEach((intersect) => {
+	  intersect.object.material.color.set("#0000ff");
+	});
+  // ... 其他代码
+}
+```
+
+#### 优化建议
+
+**问题**：在render循环中重复创建Raycaster效率低
+
+**优化方案**：
+
+```javascript
+// 在循环外创建
+const raycaster = new THREE.Raycaster();
+const rayOrgin = new THREE.Vector3(-3, 0, 0);
+const rayDirection = new THREE.Vector3(1, 0, 0);
+rayDirection.normalize();
+
+function render() {
+  // 只更新必要的数据
+  raycaster.set(rayOrgin, rayDirection);
+  // ... 其他代码
+}
+```
+
+### 3. 鼠标事件处理
+
+#### 鼠标坐标转换
+
+```javascript
+const mouse = new THREE.Vector2();
+
+const mouseMoveEvent = (e: MouseEvent) => {
+  // 将屏幕坐标转换为标准化设备坐标（NDC）
+  mouse.x = (e.clientX / sizes.width) * 2 - 1;   // [-1, 1]
+  mouse.y = -(e.clientY / sizes.height) * 2 + 1; // [-1, 1]
+};
+```
+
+#### raycaster.setFromCamera() vs raycaster.set()
+
+- **`raycaster.set(origin, direction)`**：通用方法，需要手动指定射线的起点和方向（适用于自定义射线，如场景内固定方向的射线）。
+- **`raycaster.setFromCamera(mouse, camera)`**：专为相机视角设计的快捷方法，自动将 2D 鼠标坐标（`mouse`，范围`-1`到`1`）转换为 3D 射线：
+  - 起点：相机位置。
+  - 方向：从相机指向鼠标在 3D 世界中对应的点。
+- 场景差异：鼠标交互必须用 `setFromCamera`，因为需要将屏幕坐标映射到 3D 世界；自定义射线（如场景内的激光束）用 `set`。
+
+#### 射线方向说明
+
+射线是从**相机位置**射向**鼠标指向的3D空间点**，不是从鼠标射向相机。这是因为：
+
+- 在3D图形中，相机是观察点
+- 射线检测模拟的是"从眼睛看出去"的方向
+
+### 4. 鼠标点击检测优化
+
+#### 优化代码分析
+
+```javascript
+if (intersects.length) {
+  currentIntersect = intersects[0];
+} else {
+  currentIntersect = null;
+}
+```
+
+- **作用**：缓存当前鼠标下的第一个物体（`intersects[0]` 是距离最近的物体），避免在点击事件中重复执行射线检测。
+- **不做这一步的区别**：点击时需要重新调用 `raycaster.intersectObjects`，增加重复计算；且无法在鼠标移动时提前记录物体状态（如悬停效果）。
+- **普遍性**：这是通用优化方式，适用于所有需要 “鼠标 - 物体” 交互的场景（减少冗余计算，统一状态管理）。
+
+#### 完整优化方案
+
+```javascript
+let currentIntersect = null;
+
+function render() {
+  const intersects = raycaster.intersectObjects(objectToTest);
+  
+  // 只在相交状态变化时更新
+  if (intersects.length > 0) {
+    if (currentIntersect !== intersects[0]) {
+      currentIntersect = intersects[0];
+      // 触发鼠标进入事件
+    }
+  } else if (currentIntersect !== null) {
+    currentIntersect = null;
+    // 触发鼠标离开事件
+  }
+}
+```
+
+### 5.  模型交互的优化写法（鼠标经过缩放）
+
+#### 当前实现的问题
+
+```javascript
+// 每帧都检测和重置，效率低
+if (model) {
+  const modelIntersects = raycaster.intersectObject(model);
+  if (modelIntersects.length) {
+    model.scale.set(1.2, 1.2, 1.2);
+  } else {
+    model.scale.set(1, 1, 1);
+  }
+}
+```
+
+当前写法的问题：每帧执行缩放操作，即使鼠标未移动也会重复设置（浪费性能）。
+
+优化方式：
+
+1. 用状态变量记录是否悬停（避免重复设置相同状态）。
+2. 只在鼠标移动时更新射线检测（而非每帧检测）。
+
+```javascript
+// 全局状态：记录是否悬停
+let isModelHovered = false;
+const raycaster = new THREE.Raycaster(); // 全局创建一次
+
+// 鼠标移动时才更新射线检测
+function handleMouseMove(e) {
+  // 更新鼠标坐标
+  mouse.x = (e.clientX / sizes.width) * 2 - 1;
+  mouse.y = -(e.clientY / sizes.height) * 2 + 1;
+
+  // 仅在鼠标移动时执行检测
+  if (model) {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(model);
+    const newHoverState = intersects.length > 0;
+
+    // 状态变化时才更新缩放（避免重复操作）
+    if (newHoverState !== isModelHovered) {
+      isModelHovered = newHoverState;
+      model.scale.set(isModelHovered ? 1.2 : 1, isModelHovered ? 1.2 : 1, isModelHovered ? 1.2 : 1);
+    }
+  }
+}
+
+// 绑定事件（只在鼠标移动时触发）
+window.addEventListener('mousemove', handleMouseMove);
+
+// render中只保留必要的渲染逻辑
+function render() {
+  // ... 其他动画逻辑
+  renderer.render(scene, camera);
+  requestAnimationFrame(render);
+}
+```
+
+
+
 # 附录
 
 ## render 中`clock.getDelta()`输出 0 的问题

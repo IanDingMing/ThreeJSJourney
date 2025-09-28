@@ -12,6 +12,8 @@ import { FontLoader } from "three/addons/loaders/FontLoader.js";
 import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
 // glTF加载器
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+// DRACOLoader
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 // 导入自定义的纹理工具函数
 import { getTextureUrl } from "@/utils/texturesUtils";
 // 导入RectAreaLightHelper
@@ -53,11 +55,14 @@ const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
 /**
  * Model
  */
-// 1. 初始化加载器
-const gltfLoader = new GLTFLoader();
+// 1. 初始化 Draco 解码器
+const dracoLoader = new DRACOLoader();
+// 设置解码器路径（对应 public 下的资源）
+dracoLoader.setDecoderPath(`${import.meta.env.BASE_URL}draco/`); // 文件路径：/public/models/draco
 
-// 2. 定义模型路径（支持 gltf/glb 等格式）
-const modelPath = `${import.meta.env.BASE_URL}models/Duck/glTF-Binary/Duck.glb`; // 文件路径：/public/models/Duck
+// 2. 关联到 GLTFLoader
+const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
 
 const sizes = {
   width: 800,
@@ -71,15 +76,6 @@ let renderer: THREE.WebGLRenderer | null = null;
 let controls: OrbitControls | null = null;
 let gui: GUI | null = null;
 const meshArray: THREE.Mesh[] = [];
-
-const cursor = {
-  x: 0,
-  y: 0,
-};
-
-const parameters = {
-  materialColor: "#ffeded",
-};
 
 // 2. 声明事件处理函数
 const handleResize = () => {
@@ -114,32 +110,6 @@ const handleDoubleClick = () => {
     document.exitFullscreen();
   }
 };
-
-const mouse = new THREE.Vector2();
-let currentIntersect: THREE.Intersection<THREE.Object3D> | null = null;
-
-const mouseMoveEvent = (e: MouseEvent) => {
-  mouse.x = (e.clientX / sizes.width) * 2 - 1;
-  mouse.y = -(e.clientY / sizes.height) * 2 + 1;
-};
-
-const mouseClickEvenet = (e: MouseEvent) => {
-  if (currentIntersect) {
-    switch (currentIntersect.object) {
-      case meshArray[0]:
-        console.log("1");
-        break;
-      case meshArray[1]:
-        console.log("2");
-        break;
-      case meshArray[2]:
-        console.log("3");
-        break;
-      default:
-        break;
-    }
-  }
-};
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
@@ -150,63 +120,11 @@ onMounted(() => {
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 模型mesh==========================
-
-  /**
-   * Objects
-   */
-  const object1 = new THREE.Mesh(
-    new THREE.SphereGeometry(0.5, 16, 16),
-    new THREE.MeshBasicMaterial({ color: "#ff0000" })
-  );
-  object1.position.x = -2;
-
-  const object2 = new THREE.Mesh(
-    new THREE.SphereGeometry(0.5, 16, 16),
-    new THREE.MeshBasicMaterial({ color: "#ff0000" })
-  );
-
-  const object3 = new THREE.Mesh(
-    new THREE.SphereGeometry(0.5, 16, 16),
-    new THREE.MeshBasicMaterial({ color: "#ff0000" })
-  );
-  object3.position.x = 2;
-
-  meshArray.push(object1, object2, object3);
-  scene.add(object1, object2, object3);
-
-  //   /**
-  //    * Raycaster
-  //    */
-  //   const raycaster = new THREE.Raycaster();
-  //   const rayOrgin = new THREE.Vector3(-3, 0, 0);
-  //   const rayDirection = new THREE.Vector3(10, 0, 0);
-  //   rayDirection.normalize();
-
-  //   raycaster.set(rayOrgin, rayDirection);
-
-  //   const intersect = raycaster.intersectObject(object2);
-  //   console.log(intersect);
-
-  //   /**
-  //    * distance: 2.5
-  // face: {a: 136, b: 153, c: 154, normal: _Vector3, materialIndex: 0}
-  // faceIndex: 241
-  // object: Mesh {isObject3D: true, uuid: 'f60c88f6-3191-452f-9c9d-d5573fef94d8', name: '', type: 'Mesh', parent: Scene, …}
-  // point: _Vector3 {x: -0.5, y: 0, z: 0}
-  // uv: _Vector2 {x: -1.9038029661559934e-19, y: 0.49999999999999994}
-  //    */
-  //   const intersects = raycaster.intersectObjects([object1, object2, object3]);
-  //   console.log(intersects);
-
-  // 3. 执行加载
-  let model: THREE.Group | null = null;
+  let mixer: THREE.AnimationMixer | null = null;
+  // 3. 加载 Draco 压缩模型（路径指向 glTF-Draco 格式文件）
   gltfLoader.load(
-    modelPath,
-    // 加载成功回调
+    `${import.meta.env.BASE_URL}models/模型名/glTF-Draco/模型名.gltf`,
     (gltf) => {
-      // 关键：添加整个模型场景（含完整层级，避免漏元素）
-      gltf.scene.position.y = -1.2;
-      model = gltf.scene;
       scene.add(gltf.scene);
     },
     // 加载进度回调
@@ -218,17 +136,42 @@ onMounted(() => {
       console.error("加载失败：", error);
     }
   );
+
+  /**
+   * Floor
+   */
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(50, 50),
+    new THREE.MeshStandardMaterial({
+      color: "#444444",
+      metalness: 0,
+      roughness: 0.5,
+    })
+  );
+  floor.receiveShadow = true;
+  floor.rotation.x = -Math.PI * 0.5;
+  scene.add(floor);
+
   // 模型mesh==========================
   /**
    * Lights
    */
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); //创建环境光对象
-  scene.add(ambientLight); //将环境光添加到场景中
+  /**
+   * Lights
+   */
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+  scene.add(ambientLight);
 
-  // 从上方照射的白色平行光，强度为 0.5。
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7); //创建平行光对象
-  directionalLight.position.set(1, 2, 3); //设置平行光位置
-  scene.add(directionalLight); //将平行光添加到场景中
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+  directionalLight.castShadow = true;
+  directionalLight.shadow.mapSize.set(1024, 1024);
+  directionalLight.shadow.camera.far = 15;
+  directionalLight.shadow.camera.left = -7;
+  directionalLight.shadow.camera.top = 7;
+  directionalLight.shadow.camera.right = 7;
+  directionalLight.shadow.camera.bottom = -7;
+  directionalLight.position.set(5, 5, 5);
+  scene.add(directionalLight);
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
@@ -243,12 +186,12 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.z = 3;
+  camera.position.set(-8, 4, 8);
   scene.add(camera);
 
   // Controls
   controls = new OrbitControls(camera, webgl.value);
-  controls.target.set(0, 0.75, 0);
+  controls.target.set(0, 1, 0);
   controls.enableDamping = true;
 
   // 创建渲染器对象
@@ -267,72 +210,13 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
 
-    // Animater objects
-    object1.position.y = Math.sin(elapsedTime * 0.3) * 1.5;
-    object2.position.y = Math.sin(elapsedTime * 0.8) * 1.5;
-    object3.position.y = Math.sin(elapsedTime * 1.3) * 1.5;
-
-    // // Cast a ray
-    // const raycaster = new THREE.Raycaster();
-    // const rayOrgin = new THREE.Vector3(-3, 0, 0);
-    // const rayDirection = new THREE.Vector3(1, 0, 0);
-    // rayDirection.normalize();
-    // raycaster.set(rayOrgin, rayDirection);
-
-    // const objectToTest = [object1, object2, object3];
-    // const intersects = raycaster.intersectObjects(objectToTest);
-    // console.log(intersects.length);
-
-    // objectToTest.forEach((object) => {
-    //   object.material.color.set("#ff0000");
-    // });
-
-    // intersects.forEach((intersect) => {
-    //   intersect.object.material.color.set("#0000ff");
-    // });
-
-    // Cast a ray
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, camera);
-
-    const objectToTest = [object1, object2, object3];
-    const intersects = raycaster.intersectObjects(objectToTest);
-
-    objectToTest.forEach((object) => {
-      object.material.color.set("#ff0000");
-    });
-
-    if (intersects[0]?.object instanceof THREE.Mesh) {
-      (intersects[0].object.material as THREE.MeshBasicMaterial).color.set(
-        0x0000ff
-      );
-    }
-    intersects.forEach((intersect: THREE.Intersection) => {
-      // if (intersect.object instanceof THREE.Mesh) {
-      //   (intersect.object.material as THREE.MeshBasicMaterial).color.set(
-      //     0x0000ff
-      //   );
-      // }
-    });
-
-    if (intersects.length) {
-      currentIntersect = intersects[0];
-    } else {
-      currentIntersect = null;
-    }
-
-    //测试鸭子模型
-    if (model) {
-      const modelIntersects = raycaster.intersectObject(model);
-      if (modelIntersects.length) {
-        model.scale.set(1.2, 1.2, 1.2);
-      } else {
-        model.scale.set(1, 1, 1);
-      }
-    }
-
     // Animate meshes
     meshArray.forEach((mesh) => {});
+
+    // 2. 更新动画混合器
+    if (mixer) {
+      mixer.update(deltaTime);
+    }
 
     // Update controls
     controls.update();
@@ -374,7 +258,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="container" @mousemove="mouseMoveEvent" @click="mouseClickEvenet">
+  <div class="container">
     <div ref="webgl" class="webgl"></div>
   </div>
 </template>

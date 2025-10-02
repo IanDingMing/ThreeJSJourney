@@ -50,19 +50,7 @@ const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
 // getTextureUrl("environmentMaps/0/ny.jpg"),
 // getTextureUrl("environmentMaps/0/pz.jpg"),
 // getTextureUrl("environmentMaps/0/nz.jpg"),
-// ]);
-
-/**
- * Model
- */
-// 1. 初始化 Draco 解码器
-const dracoLoader = new DRACOLoader();
-// 设置解码器路径（对应 public 下的资源）
-dracoLoader.setDecoderPath(`${import.meta.env.BASE_URL}draco/`); // 文件路径：/public/models/draco
-
-// 2. 关联到 GLTFLoader
-const gltfLoader = new GLTFLoader();
-gltfLoader.setDRACOLoader(dracoLoader);
+// ])
 
 const sizes = {
   width: 800,
@@ -120,58 +108,11 @@ onMounted(() => {
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 模型mesh==========================
-  let mixer: THREE.AnimationMixer | null = null;
-  // 3. 加载 Draco 压缩模型（路径指向 glTF-Draco 格式文件）
-  gltfLoader.load(
-    `${import.meta.env.BASE_URL}models/hamburger/hamburger.glb`,
-    (gltf) => {
-      scene.add(gltf.scene);
-    },
-    // 加载进度回调
-    (xhr) => {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    // 加载错误回调
-    (error) => {
-      console.error("加载失败：", error);
-    }
-  );
-
-  /**
-   * Floor
-   */
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(50, 50),
-    new THREE.MeshStandardMaterial({
-      color: "#444444",
-      metalness: 0,
-      roughness: 0.5,
-    })
-  );
-  floor.receiveShadow = true;
-  floor.rotation.x = -Math.PI * 0.5;
-  scene.add(floor);
-
+  const geometry = new THREE.TorusKnotGeometry(1, 0.4, 100, 16);
+  const material = new THREE.MeshBasicMaterial();
+  const torusKnot = new THREE.Mesh(geometry, material);
+  scene.add(torusKnot);
   // 模型mesh==========================
-  /**
-   * Lights
-   */
-  /**
-   * Lights
-   */
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-  scene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-  directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.set(1024, 1024);
-  directionalLight.shadow.camera.far = 15;
-  directionalLight.shadow.camera.left = -7;
-  directionalLight.shadow.camera.top = 7;
-  directionalLight.shadow.camera.right = 7;
-  directionalLight.shadow.camera.bottom = -7;
-  directionalLight.position.set(5, 5, 5);
-  scene.add(directionalLight);
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
@@ -212,11 +153,6 @@ onMounted(() => {
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
-
-    // 2. 更新动画混合器
-    if (mixer) {
-      mixer.update(deltaTime);
-    }
 
     // Update controls
     controls.update();

@@ -191,7 +191,7 @@ function render() {
   new THREE.OrthographicCamera(width/-2, width/2, height/2, height/-2, 1, 1000)
   ```
 
-![20200517225522434](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/20200517225522434.png)
+![20200517225522434](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/20200517225522434.png)
 
 ### 2. 轨道控制器(OrbitControls)
 
@@ -467,7 +467,7 @@ colorTextures.repeat.y = 3;
 
 没添加RepeatWrapping
 
-![截屏2025-08-05 15.49.11](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 15.49.11.png)
+![截屏2025-08-05 15.49.11](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/截屏2025-08-05 15.49.11.png)
 
 ```
 colorTextures.wrapS = THREE.RepeatWrapping; //U方向
@@ -476,7 +476,7 @@ colorTextures.wrapT = THREE.RepeatWrapping; //V方向
 
 添加RepeatWrapping
 
-![截屏2025-08-05 15.49.30](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 15.49.30.png)
+![截屏2025-08-05 15.49.30](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/截屏2025-08-05 15.49.30.png)
 
 ```
 colorTextures.wrapS = THREE.MirroredRepeatWrapping; //U方向
@@ -485,7 +485,7 @@ colorTextures.wrapT = THREE.MirroredRepeatWrapping; //V方向
 
 添加MirroredRepeatWrapping
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 15.52.00.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/截屏2025-08-05 15.52.00.png)
 
 - .[offset](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.offset) : [Vector2](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Vector2)
 
@@ -495,7 +495,7 @@ colorTextures.wrapT = THREE.MirroredRepeatWrapping; //V方向
 colorTextures.offset.x = 0.5;//相当于左移动一半，如果设置了wrapS属性重复或者镜像，右侧会自动补齐，不然就是拉伸补齐
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 15.55.47.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/截屏2025-08-05 15.55.47.png)
 
 - .[rotation](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.rotation) : number
 
@@ -505,7 +505,7 @@ colorTextures.offset.x = 0.5;//相当于左移动一半，如果设置了wrapS�
 colorTextures.rotation = Math.PI / 4; // 旋转45度
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 22.42.32.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/截屏2025-08-05 22.42.32.png)
 
 - .[center](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/textures/Texture.center) : [Vector2](http://www.yanhuangxueyuan.com/threejs/docs/index.html#api/zh/math/Vector2)
 
@@ -516,7 +516,7 @@ colorTextures.center.x = 0.5;
 colorTextures.center.y = 0.5;
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/截屏2025-08-05 22.42.52.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/截屏2025-08-05 22.42.52.png)
 
 ### 3. 纹理参数-纹理过滤机制
 
@@ -554,11 +554,11 @@ texture.magFilter = THREE.NearestFilter;
 
   - 默认`THREE.LinearFilter`
 
-  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/checkerboard-8x8.png)
+  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/checkerboard-8x8.png)
 
   - `THREE.NearestFilter`
 
-  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/colorTextures.magFilter = THREE.NearestFilter; :: 设置纹理的放大过滤器.png)
+  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/colorTextures.magFilter = THREE.NearestFilter; :: 设置纹理的放大过滤器.png)
 
 #### 2. **minFilter（缩小过滤器）**
 - **原理**：当纹理被缩小时（多个纹素对应一个屏幕像素），决定采样策略
@@ -574,11 +574,11 @@ texture.magFilter = THREE.NearestFilter;
 
   - 默认`THREE.LinearMipmapLinearFilter`
 
-  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/checkerboard-1024x1024.png)
+  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/checkerboard-1024x1024.png)
 
   - `THREE.NearestFilter`
 
-  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/colorTextures.minFilter = THREE.NearestFilter; :: 设置纹理的最小过滤器.png)
+  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/colorTextures.minFilter = THREE.NearestFilter; :: 设置纹理的最小过滤器.png)
 
 - **关键选项**：
 
@@ -1190,7 +1190,7 @@ spotLightHelper.visible = hideHelpers;
 4. 渲染器启用阴影 `renderer.shadowMap.enabled = true`
 5. 设置光源阴影渲染范围 `[光源].shadow.camera`
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/正投影可视空间.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/正投影可视空间.png)
 
 ### 3. 阴影预设类型
 
@@ -1415,9 +1415,9 @@ Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_
   particlesMaterial.map = particleTexture;
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/map.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/map.png)
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/map-cube.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/map-cube.png)
 
 ```
   const particlesMaterial = new THREE.PointsMaterial();
@@ -1428,9 +1428,9 @@ Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_
   particlesMaterial.alphaMap = particleTexture;
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/alphaMap.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/alphaMap.png)
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/alphaMap-cube.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/alphaMap-cube.png)
 
 ```
   const particlesMaterial = new THREE.PointsMaterial();
@@ -1442,9 +1442,9 @@ Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_
   particlesMaterial.alphaTest = 0.001;//如果不透明度低于此值，则不会渲染材质。默认值为0。这里是把不透明度为0不渲染。边缘还是会有遮挡
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/alphaTest.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/alphaTest.png)
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/alphaTest-cube.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/alphaTest-cube.png)
 
 ```
   const particlesMaterial = new THREE.PointsMaterial();
@@ -1458,9 +1458,9 @@ Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_
   particlesMaterial.depthTest = false;//关闭深度测试，相当于取消遮挡。但是立方体也无法遮盖粒子
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/depthTest.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/depthTest.png)
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/depthTest-cube.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/depthTest-cube.png)
 
 
 
@@ -1478,7 +1478,7 @@ Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_
   particlesMaterial.depthWrite = false;//关闭深度写入
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/depthWrite-cube.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/depthWrite-cube.png)
 
 ```
   const particlesMaterial = new THREE.PointsMaterial();
@@ -1494,7 +1494,7 @@ Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_
   particlesMaterial.blending = THREE.AdditiveBlending;//使用AdditiveBlending增强粒子光效，如火花或能量场。需注意，过度使用AdditiveBlending可能影响性能，尤其在粒子数量较多时
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/blending-cube.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/blending-cube.png)
 
 **为粒子添加定点颜色，需要开启 `particlesMaterial.vertexColors = true;`**
 
@@ -1586,7 +1586,7 @@ Will be capped if it exceeds the hardware dependent parameter [gl.ALIASED_POINT_
       positions[i3 + 2] = 0;
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy1.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy1.png)
 
 #### 星系分支
 
@@ -1618,11 +1618,11 @@ branch = 2
       );
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy2.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy2.png)
 
 增加branch数量如下效果：
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy2-20.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy2-20.png)
 
 **乘上半径，成为线**
 
@@ -1636,7 +1636,7 @@ branch = 2
       positions[i3 + 2] = Math.sin(branchAngle) * radius;
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy2-2.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy2-2.png)
 
 #### 星系分支螺旋扭曲
 
@@ -1653,7 +1653,7 @@ spinAngle:距离中心越远，偏移程度越大，也就弯的越厉害
       positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius;
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy3.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy3.png)
 
 #### 星系分支偏移量
 
@@ -1667,9 +1667,9 @@ spinAngle:距离中心越远，偏移程度越大，也就弯的越厉害
       positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy4.png)
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-2.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy4-2.png)
 
 ```
       const randomX = (Math.random() - 0.5) * parameters.randomness;
@@ -1681,11 +1681,11 @@ spinAngle:距离中心越远，偏移程度越大，也就弯的越厉害
       positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-3.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy4-3.png)
 
 但是这个还是不好，增加粒子数量，发现偏移还是不够随机
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-4.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy4-4.png)
 
 
 
@@ -1693,7 +1693,7 @@ spinAngle:距离中心越远，偏移程度越大，也就弯的越厉害
 
 `Math.pow(Math.random(), parameters.randomnessPower)`图像表示
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-5.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy4-5.png)
 
 ```
       const randomX =
@@ -1708,9 +1708,9 @@ spinAngle:距离中心越远，偏移程度越大，也就弯的越厉害
       positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-6.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy4-6.png)
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-7.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy4-7.png)
 
 增加随机性，同时将点分布在xy面两侧
 
@@ -1730,11 +1730,11 @@ spinAngle:距离中心越远，偏移程度越大，也就弯的越厉害
       positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy4-8.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy4-8.png)
 
 增加粒子数量就有效果了
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy5.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy5.png)
 
 #### 星系加上颜色
 
@@ -1776,7 +1776,7 @@ spinAngle:距离中心越远，偏移程度越大，也就弯的越厉害
     });
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy6.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy6.png)
 
 **改进，添加混合颜色，`Color.lerp`**
 
@@ -1830,7 +1830,7 @@ alpha - 介于0到1的数字。
     });
 ```
 
-![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/Galaxy7.png)
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Galaxy7.png)
 
 
 
@@ -2865,24 +2865,39 @@ function render() {
 
 #### 渲染引擎
 
+[参数设置详解](#参数设置详解)
+
 ##### Eevee
 
 - **特点**：实时渲染引擎
+
 - **优势**：
   - 渲染速度快
   - 适合实时预览
   - 对硬件要求较低
+  
 - **适用场景**：动画、游戏、快速预览
+
+- 参数参考
+
+  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Snipaste_2025-10-02_21-30-56.png)
 
 ##### Cycles
 
 - **特点**：基于物理的路径追踪渲染器
+
 - **优势**：
   - 渲染质量高
   - 物理准确性好
   - 支持复杂光照效果
+  
 - **缺点**：渲染速度较慢
+
 - **适用场景**：高质量静帧、产品渲染、建筑可视化
+
+- 参数参考：
+
+  ![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Snipaste_2025-10-02_21-31-24.png)
 
 ##### Workflow
 
@@ -2960,6 +2975,426 @@ function render() {
 - **压缩**：勾选后会对模型数据进行压缩，显著减小文件体积，适合网络传输（不影响模型质量）。
 
 
+
+## P26 Environment map
+
+### 1. 基础环境贴图应用
+
+#### 1.1 核心概念回顾
+
+环境贴图（Environment Map）是 Three.js 中实现真实反射、折射效果的关键技术，通过模拟物体周围环境的光照信息，让 PBR（基于物理的渲染）材质呈现出贴近真实世界的光影表现。常见形式包括：
+
+- 静态立方体贴图（CubeTexture）：由 6 张图片组成，对应上下左右前后六个方向
+- 等矩形全景图（HDR/EXR）：单张 2:1 比例的全景图，通过`EquirectangularReflectionMapping`映射为球形环境
+- 实时环境贴图：通过相机实时渲染场景生成，能动态反映场景中物体 / 光源的变化
+
+#### 1.2 立方体贴图
+
+```typescript
+// 加载立方体贴图
+const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
+const environmentMapTexture = cubeTextureLoader.load([
+  getTextureUrl("environmentMaps/2/px.jpg"),
+  getTextureUrl("environmentMaps/2/nx.jpg"),
+  getTextureUrl("environmentMaps/2/py.jpg"),
+  getTextureUrl("environmentMaps/2/ny.jpg"),
+  getTextureUrl("environmentMaps/2/pz.jpg"),
+  getTextureUrl("environmentMaps/2/nz.jpg"),
+]);
+
+// 设置为场景背景
+scene.background = environmentMapTexture;
+
+// 为单个模型设置环境贴图
+torusKnot.material.envMap = environmentMapTexture;
+```
+
+#### 1.3 场景级环境贴图
+
+```typescript
+// 为场景中所有模型自动应用环境贴图
+scene.environment = environmentMapTexture;
+```
+
+**优势**：自动应用到所有StandardMaterial和PhysicalMaterial材质
+
+
+
+### 2. 环境贴图强度控制
+
+#### 2.1 批量更新材质
+
+```typescript
+const updateAllMaterials = (scene) => {
+  scene.traverse((child) => {
+    if (child.isMesh && child.material.isMeshStandardMaterial) {
+      child.material.envMapIntensity = global.envMapIntensity;
+    }
+  });
+};
+```
+
+#### 2.2 场景背景控制
+
+```typescript
+scene.backgroundBlurriness = 0.2;    // 背景模糊度 0-1
+scene.backgroundIntensity = 5;       // 背景强度
+```
+
+
+
+### 3. HDR全景贴图
+
+#### 3.1 加载HDR纹理
+
+```typescript
+import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
+
+const rgbeLoader = new RGBELoader();
+const environmentMapsPath = new URL(
+  "../assets/textures/environmentMaps/blender-2k.hdr",
+  import.meta.url
+).href;// src/assets/textures/environmentMaps/blender-2k.hdr
+
+  // HDR (RGBE) equirectangular
+  rgbeLoader.load(environmentMapsPath, (environmentMap) => {
+    environmentMap.mapping = THREE.EquirectangularReflectionMapping;
+
+    scene.background = environmentMap;
+    scene.environment = environmentMap;
+  });
+```
+
+**加载EXR纹理，但是加载器要使用EXRLoader**
+
+#### 3.2 地面投影天空盒Ground Projected Skybox
+
+```typescript
+  // Ground projected skybox
+  rgbeLoader.load(environmentMapsPath, (environmentMap) => {
+    environmentMap.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = environmentMap;
+    
+    // 创建地面投影天空盒
+    const skybox = new GroundProjectedSkybox(environmentMap)
+    skybox.radius = 120  // 天空盒半径
+    skybox.height = 11   // 天空盒高度
+    skybox.scale.setScalar(50)
+    scene.add(skybox)
+  });
+  
+  
+  // gui调试
+  gui.add(skybox, "radius", 1, 200, 0.1);
+  gui.add(skybox, "height", 1, 200, 0.01);
+```
+
+**与传统环境贴图的区别**：
+
+- **传统环境贴图**：无限远背景，没有深度感
+- **Ground Projected Skybox**：模拟地面和天空，提供深度和空间感
+- **适用场景**：需要地面反射和更真实空间感的场景
+
+
+
+### 4. Blender制作HDR环境贴图完整指南
+
+#### 🎯 制作流程概览
+
+##### 1. 场景准备
+
+1. 新建/打开Blender文件
+2. 删除默认物体：`A` → `X` → 确认删除
+3. 确保场景为空白状态
+
+##### 2. 摄像机设置（关键步骤）
+
+***摄像机重置***
+
+1. 添加摄像机 → Alt+G (清空位置) → Alt+R (清空旋转)
+2. 旋转摄像机绕X轴90度：
+   - 按R → X → 90
+   - 或属性面板直接输入旋转值
+
+***摄像机属性设置***
+
+1. 选择摄像机，进入Object Data Properties (摄像机图标)
+2. 摄像机类型：Perspective (类型) → Panoramic (全景)
+3. 全景类型：全景类型→Equirectangular (ERP) (等距圆柱ERP)
+
+[全景类型详解](#📷 全景类型详解)
+
+#### 💡 光照与渲染设置
+
+##### 1. 添加面光
+
+1. Shift+A → Light → Area面光
+2. 调整位置和角度到合适位置
+3. 设置大小：影响光照范围和强度
+
+##### 2. 可见性设置
+
+1. 选择面光 → Object Properties (黄色立方体图标)
+2. 找到"Ray Visibility""射线可见性"部分
+3. 勾选"Camera"选项
+   - ✅ 效果：面光本身在渲染中可见
+   - ❌ 不勾选：仅提供光照，不可见
+
+#### 🚀 渲染输出设置
+
+##### 1. 渲染属性
+
+1. 进入Render Properties (相机图标)
+2. 设备选择：CPU/CUDA (根据硬件)
+3. 采样设置：根据质量需求调整
+
+##### 2. 输出设置
+
+1. 进入Output Properties (打印机图标)
+2. 分辨率：推荐2K (2048×1024) 或更高
+3. 输出格式：选择HDR
+
+##### 3. 最终渲染导出
+
+1. F12 开始渲染
+2. 预览渲染结果
+3. 图像菜单 → 保存为(可保存为HDR格式) 或 另存为
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Snipaste_2025-10-02_21-07-30.png)
+
+#### 🔧 Three.js中使用
+
+```
+// 在Three.js中加载制作的HDR
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+
+const rgbeLoader = new RGBELoader();
+rgbeLoader.load('blender-2k.hdr', (texture) => {
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  scene.environment = texture;
+  scene.background = texture;
+});
+```
+
+
+
+### 5. 动态环境贴图与CubeCamera
+
+#### 5.1 实时环境贴图系统
+
+```typescript
+// 创建渲染目标
+const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
+  type: THREE.HalfFloatType  // 支持HDR颜色值
+});
+
+// 创建立方体相机
+const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget);
+
+// 设置场景环境贴图
+scene.environment = cubeRenderTarget.texture;
+
+// 在渲染循环中更新
+function render() {
+  // 更新CubeCamera位置（跟随需要反射的物体）
+  cubeCamera.position.copy(reflectiveObject.position);
+  
+  // 拍摄场景并更新环境贴图
+  cubeCamera.update(renderer, scene);
+  
+  renderer.render(scene, camera);
+}
+```
+
+[为什么用`WebGLCubeRenderTarget`加载纹理给`scene.environment`？](#为什么用`WebGLCubeRenderTarget`加载纹理给`scene.environment`？)
+
+[`CubeCamera`是什么？为何要配合`WebGLCubeRenderTarget`使用？](# `CubeCamera`是什么？为何要配合`WebGLCubeRenderTarget`使用？)
+
+[`cubeCamera.update(renderer, scene)`的作用是什么？](#`cubeCamera.update(renderer, scene)`的作用是什么？)
+
+#### 5.2 图层系统应用
+
+**实时环境贴图会产生贴图包含 “无关物体”的问题，需要使用图层来解决**
+
+##### 1. 图层基础操作
+
+```typescript
+// 启用特定图层（0-31）
+object.layers.enable(layerIndex);
+
+// 禁用特定图层
+object.layers.disable(layerIndex);
+
+// 设置物体只存在于特定图层
+object.layers.set(layerIndex);
+
+// 相机设置渲染图层
+camera.layers.set(layerIndex);      // 只渲染指定图层
+camera.layers.enable(layerIndex);   // 额外渲染指定图层
+```
+
+##### 2. 解决自反射问题
+
+```typescript
+// 环状灯光分配到图层1
+holyDonut.layers.enable(1);
+
+// CubeCamera只拍摄图层1
+cubeCamera.layers.set(1);
+
+// 主相机渲染所有图层（默认）
+// camera.layers.enableAll();
+```
+
+##### 3. 图层应用场景
+
+Three.js 的`layers`系统用于控制 “哪些物体被哪些相机渲染”（默认所有物体和相机都在图层 0），核心作用是 “选择性渲染”：
+
+- 案例中，环状灯光被放入图层 1，`CubeCamera`也被设置为只渲染图层 1，确保环境贴图中**只包含灯光信息**，避免其他物体（如模型本身）干扰反射效果。
+- 其他场景：
+  - 多相机渲染（如主相机渲染 3D 场景，UI 相机只渲染 2D 界面元素）。
+  - 隐藏辅助物体（如网格线、坐标轴只在编辑视图显示，最终渲染不显示）。
+  - 分层渲染特效（如角色阴影单独渲染到一个图层，再与主场景合成）。
+
+#### 5.3 示例：环状灯光的应用
+
+[为什么调节环状灯光颜色来改变光照，而非直接增加光源？](#为什么调节环状灯光颜色来改变光照，而非直接增加光源？)
+
+[环状灯光被放入图层 1，`CubeCamera`也被设置为只渲染图层 1，确保环境贴图中**只包含灯光信息**什么意思？](#环状灯光被放入图层 1，`CubeCamera`也被设置为只渲染图层 1，确保环境贴图中**只包含灯光信息**什么意思？)
+
+##### 1. 创建环状灯光
+
+```typescript
+scene.background = environmentMapTexture;
+
+// 1. 创建环状物体
+const holyDonut = new THREE.Mesh(
+  new THREE.TorusGeometry(8, 0.5),
+  new THREE.MeshBasicMaterial({ color: 'white' })
+);
+holyDonut.layers.enable(1);
+holyDonut.position.y = 3.5;
+scene.add(holyDonut);
+
+// 2. 创建立方体渲染目标
+const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
+  type: THREE.HalfFloatType,
+});
+scene.environment = cubeRenderTarget.texture;
+
+// 3. 创建立方体相机
+const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget);
+cubeCamera.layers.set(1);
+
+// 4. 渲染循环
+const clock = new THREE.Clock();
+function render() {
+  const elapsedTime = clock.getElapsedTime();
+  
+  // 实时环境贴图更新
+  if (holyDonut) {
+    holyDonut.rotation.x = Math.sin(elapsedTime) * 2;
+    cubeCamera.update(renderer, scene);
+  }
+  
+  renderer.render(scene, camera);
+  requestAnimationFrame(render);
+}
+
+render();
+```
+
+##### 2. 颜色强度说明
+
+```typescript
+// 不同颜色强度效果对比
+new THREE.Color(1, 1, 1)     // 标准白色 - 微弱发光
+new THREE.Color(10, 10, 10)  // 10倍强度 - 明显发光  
+new THREE.Color(100, 100, 100) // 100倍强度 - 强烈发光
+new THREE.Color(10, 4, 2)    // 暖色调 - 模拟暖色灯光
+```
+
+##### 3. 环状灯光例子的实际应用场景
+
+这个例子看似复杂，实则展示了 “动态环境反射” 的核心技术，典型应用场景包括：
+
+- 产品展示：如汽车模型反射周围动态变化的展厅灯光。
+- 游戏场景：角色武器反射移动的霓虹灯、火焰等动态发光体。
+- 交互设计：用户操作的光源（如移动的射灯）实时影响物体反射效果，增强沉浸感。
+- 本质是模拟 “真实世界中物体反射动态环境” 的物理现象，静态环境贴图无法实现这一点。
+
+
+
+### 6. 核心概念解析
+
+#### 6.1 CubeCamera工作原理
+
+- **作用**：从当前位置向6个方向拍摄场景，生成立方体贴图
+- **WebGLCubeRenderTarget**：存储6个方向的拍摄结果
+- `cubeCamera.update()`：执行拍摄并更新纹理
+
+#### 6.2 图层系统应用场景
+
+1. **避免自反射问题**：防止物体在环境贴图中反射自己
+2. **选择性反射**：只让特定物体出现在反射中
+3. **性能优化**：减少环境贴图需要渲染的内容
+
+#### 6.3 环状灯光的应用价值
+
+这个例子的实际应用场景包括：
+
+1. **动态光源反射**：
+
+   ```typescript
+   // 模拟霓虹灯、LED灯带等发光物体的反射效果
+   const neonLight = new THREE.Mesh(
+     new THREE.TorusGeometry(5, 0.2),
+     new THREE.MeshBasicMaterial({ color: new THREE.Color(10, 2, 5) })
+   );
+   neonLight.layers.enable(1);
+   ```
+
+2. **特殊效果制作**：
+
+   - 夜店灯光环境
+   - 科幻场景的光环效果
+   - 产品展示中的装饰性灯光
+
+3. **为什么不用普通光源**：
+
+   - 环境贴图提供**全局照明**和**反射**，而普通光源只提供直接照明
+   - 金属材质主要依赖环境贴图来表现反射特性
+
+#### 技术对比与总结
+
+| 环境贴图类型      | 实现方式                               | 优点                   | 缺点                       | 适用场景                 |
+| ----------------- | -------------------------------------- | ---------------------- | -------------------------- | ------------------------ |
+| 静态立方体贴图    | `CubeTextureLoader`加载 6 张图片       | 性能好，加载快         | 无法动态更新               | 固定环境（如室外天空）   |
+| 静态全景图（HDR） | `RGBELoader`加载 HDR/EXR 文件          | 光照信息丰富，真实感强 | 无法动态更新，文件较大     | 高质量固定场景（如室内） |
+| 实时环境贴图      | `CubeCamera` + `WebGLCubeRenderTarget` | 可动态反映场景变化     | 性能消耗较高（需实时渲染） | 动态场景（如移动光源）   |
+
+
+
+### 7. 实用配置建议
+
+#### 7.1 性能优化
+
+```typescript
+// 适当降低分辨率平衡性能和质量
+const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(128, {  // 256→128
+  type: THREE.HalfFloatType
+});
+```
+
+#### 7.2 混合使用策略
+
+```typescript
+// 静态环境 + 动态灯光
+scene.environment = staticEnvironmentMap;  // 静态环境
+cubeCamera.layers.set(1);                  // 动态灯光层
+```
+
+[这种方式和` scene.environment = cubeRenderTarget.texture;`有什么区别？](#这种方式和` scene.environment = cubeRenderTarget.texture;`有什么区别？)
 
 
 
@@ -3831,6 +4266,72 @@ update();
 
 ------
 
+## 参数设置详解
+
+### 🎯 Eevee采样设置
+
+Eevee是实时渲染引擎，**视图采样**影响3D视图port的预览质量，**渲染采样**影响最终输出的图像质量。提高采样值主要为了**减少锯齿和闪烁**。
+
+**参考数值与设置建议：**
+
+- **视图采样**：日常编辑和预览时，设置为 **16-32** 通常能在性能和质量间取得良好平衡。Blender默认的16是个不错的起点。
+- **渲染采样**：最终输出时，**64-128** 适用于多数情况。如果场景有大量反射、折射或复杂阴影，你可能需要提高到 **128-200**。
+
+**提升Eevee渲染质量的额外技巧：**
+记得在Eevee的渲染属性中，开启并调整 **环境光遮蔽**、**屏幕空间反射** 和 **阴影** 设置（如提高立方体尺寸和级联数量），这些对最终质量影响很大，有时比单纯提高采样更有效。
+
+### 🐢 Cycles采样设置
+
+Cycles是物理路径追踪引擎，以较长的渲染时间换取更真实的光照效果。它的采样设置稍微复杂，核心思路是**控制每个像素发射的光线数量**，采样次数越多，渲染结果中的噪点通常越少，图像也更精确，但渲染时间会增加。
+
+这里简单了解一下Cycles采样设置中几个关键参数的作用：
+
+| 参数         | 作用                                                         |
+| :----------- | :----------------------------------------------------------- |
+| **最大采样** | 设置**每个像素计算的最大光线数量**，是**图像质量的上限**。   |
+| **噪波阈值** | **自适应采样的关键**。Cycles会优先在噪点多的区域分配更多采样。值越低，要求越严格，噪点越少，但渲染越慢。典型值在0.1至0.001的范围内。 |
+| **最小采样** | 在应用自适应采样前，每个像素**至少会计算的采样数**。         |
+
+**推荐的数值策略：**
+
+1. **核心策略：启用自适应采样**
+   这是高效平衡Cycles渲染质量和速度的**关键**。你可以在Cycles的渲染设置中启用 **自适应采样** 。
+2. **视图（预览）采样设置**
+   - **最大采样**：设为 **32-64**。预览时无需太高。
+   - **噪波阈值**：可尝试 **0.02-0.05**，优先保证流畅交互。
+   - **最小采样**：可使用默认的 **0**，或设为 **8-16**。
+   - **务必开启视口降噪**：在视图port的降噪设置中，选择 **OptiX** (NVIDIA GPU) 或 **OpenImageDenoise**。
+3. **渲染（最终输出）采样设置**
+   - **最大采样**：作为安全上限，可设为 **256-1024**。
+   - **噪波阈值**：这是**主要调整参数**。
+     - **草稿/快速测试**：约 **0.05**
+     - **中等质量**：**0.01 - 0.005**
+     - **高质量/最终输出**：**0.005 - 0.001**
+   - **最小采样**：通常保持 **0**（自动）即可。若场景有大片平滑区域，可设为 **32-64**，防止过早停止采样。
+   - **时间限制**：若非批量渲染或时间紧迫，一般设为 **0**，仅由采样设置控制停止。
+
+**别忘了降噪！**
+对于Cycles最终渲染，**强烈建议启用降噪**。
+
+- 在渲染属性的降噪设置中，选择 **OpenImageDenoise** (CPU，质量通常较高) 或 **OptiX** (NVIDIA GPU)。
+- **输入通道**建议至少选择 **反照率 (Albedo)**，更好的选择是 **反照率+法向 (Albedo+Normal)**，这样能保留更多细节。
+
+### 💎 实用参数汇总
+
+下表总结了两个引擎的推荐起始数值，你可以根据项目需求调整：
+
+| 场景            | 引擎   | 视图采样 (最大) | 渲染采样 (最大) | 噪波阈值 (渲染) | 最小采样 (渲染) |
+| :-------------- | :----- | :-------------- | :-------------- | :-------------- | :-------------- |
+| **快速预览**    | Eevee  | 16-32           | -               | -               | -               |
+| **最终静帧**    | Eevee  | -               | 64-128          | -               | -               |
+| **快速预览**    | Cycles | 32-64           | -               | 0.02-0.05       | 0 (或 8-16)     |
+| **中等质量**    | Cycles | -               | 256-512         | 0.01-0.005      | 0               |
+| **高质量/最终** | Cycles | -               | 512-1024        | 0.005-0.001     | 0               |
+
+------
+
+
+
 ## 为什么用立方体加 “模型细分” 做球，而不直接用球？
 
 - **可控性更强**：立方体初始结构简单（6 个面），通过 “模型细分” 修改器可精确控制细分层级（类似 Three.js 的 segment），按需增加细节（层级越低，模型越简洁；层级越高，越接近球体）。
@@ -3875,6 +4376,165 @@ update();
 - **属性旋转（物体模式）**：在物体属性面板直接修改 “旋转” 数值，属于对整个物体的变换操作。会影响物体的 “变换属性”（如旋转值可能不为 0），若后续缩放可能导致比例异常（因为变换属性会累积）。
 - **编辑模式旋转**：进入编辑模式后对网格本身进行旋转，属于对模型顶点的直接修改，不改变物体的 “变换属性”（旋转值保持 0）。后续缩放、移动等操作更稳定，不会因变换属性累积导致异常。
 - **结论**：制作顶部面包胚时，建议用**编辑模式旋转**，避免物体变换属性异常。
+
+------
+
+
+
+## 📷 全景类型详解
+
+### 等距圆柱ERP (Equirectangular)
+
+- **格式**：2:1比例的矩形图像
+- **特点**：最常见的360°全景格式
+- **兼容性**：Three.js等主流引擎完美支持
+- **用途**：标准HDR环境贴图
+
+### 其他全景类型对比
+
+| 类型            | 输出格式 | Three.js兼容性 | 适用场景         |
+| --------------- | -------- | -------------- | ---------------- |
+| Equirectangular | 2:1矩形  | ✅ 完美支持     | 环境贴图、天空盒 |
+| Mirror Ball     | 圆形图像 | ❌ 不支持       | 特殊效果         |
+| Fisheye         | 鱼眼变形 | ⚠️ 需要转换     | VR、特殊镜头     |
+| Cubemap         | 6张面图  | ✅ 支持         | 高性能环境       |
+
+------
+
+
+
+## 为什么用`WebGLCubeRenderTarget`加载纹理给`scene.environment`？
+
+`WebGLCubeRenderTarget`是一个 “动态立方体贴图容器”，本质是一块 GPU 内存中的渲染目标（类似 “画布”），用于存储 CubeCamera 渲染的结果。
+
+- 静态环境贴图（如`CubeTextureLoader`加载的图片）无法随场景变化更新，适合固定环境（如室外天空）。
+- 当场景中有动态元素（如移动的发光物体、变化的光源）时，需要**实时更新环境贴图**，此时需用`WebGLCubeRenderTarget`作为 “动态画布”，让 CubeCamera 将实时渲染结果存入其中，再赋值给`scene.environment`，使物体反射效果同步更新。
+
+------
+
+
+
+##  `CubeCamera`是什么？为何要配合`WebGLCubeRenderTarget`使用？
+
+`CubeCamera`是一个特殊相机，由 6 个正交相机组成（对应立方体贴图的 6 个面），能从某一点向 “上下左右前后” 六个方向同时渲染场景，生成完整的立方体贴图信息。
+
+- 它必须配合`WebGLCubeRenderTarget`使用：因为`CubeCamera`渲染的结果需要一个 “存储容器”，而`WebGLCubeRenderTarget`就是这个容器，其`texture`属性可直接作为环境贴图使用。
+- 简单说：`CubeCamera`负责 “拍摄环境”，`WebGLCubeRenderTarget`负责 “保存照片”，两者结合才能生成实时环境贴图。
+
+------
+
+
+
+## `cubeCamera.update(renderer, scene)`的作用是什么？
+
+这行代码是 “实时环境贴图” 的核心，作用是：让`CubeCamera`重新渲染当前场景，并将新的渲染结果更新到`WebGLCubeRenderTarget`中。
+
+- 在动画循环中调用，可确保环境贴图随场景变化（如环状灯光旋转）实时更新，从而让模型的反射效果同步变化（比如反射的灯光位置随旋转改变）。
+- 看似麻烦，但这是实现动态反射的必要步骤（如游戏中角色反射移动的车灯、虚拟展厅中物体反射动态射灯）。
+
+------
+
+
+
+## 为什么调节环状灯光颜色来改变光照，而非直接增加光源？
+
+这里的 “环状灯光” 并非传统光源（如`PointLight`），而是**作为 “发光物体” 被环境贴图捕捉**，从而影响模型的反射效果，与传统光源的作用不同：
+
+- 传统光源（`DirectionalLight`/`PointLight`）影响物体的 “直接光照”（如表面明暗、阴影）。
+- 环状灯光通过`CubeCamera`被渲染到环境贴图中，影响物体的 “间接反射”（如金属表面反射灯光的颜色和形状）。
+- 例子中调节其颜色，本质是改变 “环境贴图中发光体的颜色”，从而让模型反射出对应的色彩（模拟真实世界中 “物体反射周围发光体” 的效果）。
+
+------
+
+
+
+## 环状灯光被放入图层 1，`CubeCamera`也被设置为只渲染图层 1，确保环境贴图中**只包含灯光信息**什么意思？
+
+### 1. 先明确目标：我们想要什么效果？
+
+在那个例子中，我们希望实现的是：**模型表面既反射 “静态环境贴图”（比如天空、房间），又反射 “动态的环状灯光”**（类似现实中金属球既反射窗外的天空，又反射室内的台灯）。
+
+但这里有个问题：如果直接用`CubeCamera`渲染整个场景，生成的动态环境贴图会包含 **所有物体**（包括模型本身、其他几何体、静态环境背景等）。这会导致模型反射出一些 “不该有的东西”（比如反射到自己的一部分），破坏真实感。
+
+### 2. 为什么环境贴图不能包含 “无关物体”？
+
+假设不设置图层，`CubeCamera`会渲染场景中所有物体（默认都在图层 0），生成的环境贴图会包含：
+
+- 环状灯光（我们需要它被反射）
+- 模型本身（比如那个 torusKnot 圆环结）
+- 其他几何体（如果有的话）
+- 甚至静态环境背景
+
+这时模型反射的环境贴图里会出现 **“自己的倒影”**（类似镜子对着镜子产生无限循环），或者反射到与灯光无关的物体，导致反射效果混乱、不真实。
+
+### 3. 图层如何解决这个问题？
+
+Three.js 的`layers`本质是 **“渲染过滤器”**：
+
+- 每个物体和相机都属于某个图层（默认图层 0）。
+- 相机只能渲染 **自己所在图层的物体**（其他图层的物体 “不可见”）。
+
+在例子中：
+
+- 我们把 **环状灯光** 放入图层 1（`holyDonut.layers.enable(1)`），同时让它 **离开默认图层 0**（可选，避免被其他相机误渲染）。
+- 让 **CubeCamera** 只渲染图层 1（`cubeCamera.layers.set(1)`）。
+
+这样一来，`CubeCamera`在更新环境贴图时，**只能 “看到” 图层 1 的物体（也就是环状灯光）**，生成的环境贴图里就只有灯光的信息，不会包含模型本身或其他无关物体。
+
+### 4. 最终效果：反射分离且可控
+
+通过这种设置，模型的反射会由两部分组成：
+
+- **静态环境反射**：来自`scene.environment`的基础环境贴图（比如天空、房间）。
+- **动态灯光反射**：来自`CubeCamera`生成的环境贴图（只包含环状灯光，且随灯光移动实时更新）。
+
+两者互不干扰，既保留了静态环境的真实感，又实现了动态灯光的反射效果，且不会出现 “反射到自己” 的错误。
+
+### 一句话总结
+
+用图层让`CubeCamera`只渲染环状灯光，是为了 **“精准控制动态环境贴图的内容”**—— 只包含我们需要的灯光信息，排除其他干扰物体，让反射效果更符合预期。
+
+------
+
+
+
+## 这种方式和` scene.environment = cubeRenderTarget.texture;`有什么区别？
+
+这两种用法的核心区别在于 **“物体反射的环境信息来源不同”**，直接决定了模型表面会反射哪些内容。我们通过具体场景拆解：
+
+### 1. `scene.environment = staticEnvironmentMap`（静态环境 + 动态灯光分层）
+
+- **原理**：场景的基础环境贴图是`staticEnvironmentMap`（比如 HDR 全景图、静态立方体贴图），这意味着所有使用 PBR 材质（`MeshStandardMaterial`等）的物体，默认会反射这个静态环境（如天空、房间、远处的景物）。
+
+  同时，`cubeCamera.layers.set(1)`表示：CubeCamera 只渲染图层 1 的物体（比如环状灯光），生成的`cubeRenderTarget.texture`仅包含动态灯光信息。但此时这个动态贴图**并没有直接赋值给`scene.environment`**，而是需要手动关联到物体材质上（例如：`mesh.material.envMap = cubeRenderTarget.texture`）。
+
+- **最终效果**：物体的反射由两部分叠加：
+
+  - 基础反射：来自`staticEnvironmentMap`的静态环境（天空、房间等固定元素）。
+  - 动态反射：来自`cubeRenderTarget.texture`的动态灯光（环状灯光的位置、颜色变化会实时反映在反射中）。
+
+- **适用场景**：需要同时保留 “静态大环境” 和 “动态小光源” 的反射（比如：金属球既反射窗外的天空，又反射室内移动的台灯）。
+
+### 2. `scene.environment = cubeRenderTarget.texture`（纯动态环境）
+
+- **原理**：场景的环境贴图直接替换为`cubeRenderTarget.texture`，而这个贴图是 CubeCamera 渲染的结果（如果 CubeCamera 设置了`layers.set(1)`，则仅包含图层 1 的物体，比如环状灯光）。
+
+  此时，所有 PBR 材质的物体**只会反射这个动态贴图的内容**，不再反射`staticEnvironmentMap`的静态环境（除非手动将静态环境设置到材质的`envMap`上）。
+
+- **最终效果**：物体的反射完全由`cubeRenderTarget.texture`决定 —— 如果 CubeCamera 只渲染环状灯光，那么物体表面只会反射这个动态灯光（比如：金属球看起来像在纯黑环境中，只反射周围旋转的彩色光环）。
+
+- **适用场景**：不需要静态环境反射，只关注动态元素的反射（比如：黑暗房间里的金属物体，只反射移动的手电筒光）。
+
+### 关键对比表
+
+| 用法                                                         | 反射信息来源                                    | 静态环境是否参与反射 | 动态灯光是否参与反射  | 典型场景                                 |
+| ------------------------------------------------------------ | ----------------------------------------------- | -------------------- | --------------------- | ---------------------------------------- |
+| `scene.environment = staticEnvironmentMap` + CubeCamera 分层 | 静态环境贴图（主） + 动态灯光贴图（需手动关联） | 是                   | 是（需额外设置）      | 室外场景中，物体既反射天空又反射移动车灯 |
+| `scene.environment = cubeRenderTarget.texture`               | 仅动态灯光贴图（CubeCamera 渲染的内容）         | 否（除非手动添加）   | 是（仅图层 1 的灯光） | 黑暗环境中，物体只反射动态光源           |
+
+### 一句话总结
+
+前者是 “静态环境打底 + 动态灯光补充反射”，后者是 “完全用动态内容（如灯光）作为反射源”。选择哪种取决于你是否需要保留静态环境的反射信息。
 
 ------
 

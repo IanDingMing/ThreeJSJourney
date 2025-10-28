@@ -144,75 +144,16 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
-  /**
-   * Environment map
-   */
-  // scene.environment = environmentMapTexture;
-  scene.background = environmentMapTexture;
-  // scene.backgroundBlurriness = 0.2;
-  // scene.backgroundIntensity = 5;
-
-  // // HDR (RGBE) equirectangular
-  // rgbeLoader.load(environmentMapsLightPath, (environmentMap) => {
-  //   environmentMap.mapping = THREE.EquirectangularReflectionMapping;
-
-  //   scene.background = environmentMap;
-  //   scene.environment = environmentMap;
-  // });
 
   // 模型mesh==========================
-  const geometry = new THREE.TorusKnotGeometry(1, 0.4, 100, 16);
-  const material = new THREE.MeshStandardMaterial({
-    roughness: 0,
-    metalness: 1,
-    color: 0xaaaaaa,
-  });
-  const torusKnot = new THREE.Mesh(geometry, material);
-  torusKnot.position.x = -4;
-  torusKnot.position.y = 4;
-  scene.add(torusKnot);
-
-  // holyDonut
-  const holyDonut = new THREE.Mesh(
-    new THREE.TorusGeometry(8, 0.5),
-    new THREE.MeshBasicMaterial({ color: new THREE.Color(10, 4, 2) })
+  /**
+   * Test sphere
+   */
+  const testSphere = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 32, 32),
+    new THREE.MeshBasicMaterial()
   );
-  holyDonut.layers.enable(1);
-  holyDonut.position.y = 3.5;
-  scene.add(holyDonut);
-
-  // Cube render target
-  const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
-    type: THREE.HalfFloatType,
-  });
-  scene.environment = cubeRenderTarget.texture;
-
-  // Cube camera
-  const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget);
-  cubeCamera.layers.set(1);
-
-  // 3. 执行加载
-  gltfLoader.load(
-    modelPath,
-    // 加载成功回调
-    (gltf) => {
-      // 关键：添加整个模型场景（含完整层级，避免漏元素）
-      scene.add(gltf.scene);
-
-      // 可选：模型变换（缩放、位移等）
-      gltf.scene.scale.set(10, 10, 10); // 缩放适配场景
-
-      updateAllMaterials(scene);
-    },
-    // 加载进度回调
-    (xhr) => {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    // 加载错误回调
-    (error) => {
-      console.error("加载失败：", error);
-    }
-  );
+  scene.add(testSphere);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -228,12 +169,11 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(-8, 4, 8);
+  camera.position.set(4, 1, -4);
   scene.add(camera);
 
   // Controls
   controls = new OrbitControls(camera, webgl.value);
-  controls.target.set(0, 1, 0);
   controls.enableDamping = true;
 
   // 创建渲染器对象
@@ -252,12 +192,6 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
 
-    // Real time environment map
-    if (holyDonut) {
-      holyDonut.rotation.x = Math.sin(elapsedTime) * 2;
-
-      cubeCamera.update(renderer, scene);
-    }
     // Animate meshes
     meshArray.forEach((mesh) => {});
 
@@ -274,12 +208,7 @@ onMounted(() => {
 
   // 创建GUI===================
   gui = new GUI();
-  gui
-    .add(global, "envMapIntensity", 0, 10, 0.0001)
-    .onChange(() => updateAllMaterials(scene));
 
-  gui.add(scene, "backgroundBlurriness", 0, 1, 0.001);
-  gui.add(scene, "backgroundIntensity", 0, 10, 0.001);
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

@@ -3024,10 +3024,26 @@ scene.environment = environmentMapTexture;
 
 #### 2.1 批量更新材质
 
-```typescript
+```javascript
 const updateAllMaterials = (scene) => {
   scene.traverse((child) => {
     if (child.isMesh && child.material.isMeshStandardMaterial) {
+      child.material.envMapIntensity = global.envMapIntensity;
+    }
+  });
+};
+```
+
+```typescript
+/**
+ * Update all materials
+ */
+const updateAllMaterials = (scene: THREE.Scene) => {
+  scene.traverse((child) => {
+    if (
+      child instanceof THREE.Mesh &&
+      child.material instanceof THREE.MeshStandardMaterial
+    ) {
       child.material.envMapIntensity = global.envMapIntensity;
     }
   });

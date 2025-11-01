@@ -2214,7 +2214,7 @@ const createSphere = (radius: number, position: Position): void => {
 function render() {
   // ... 省略滚动位置更新代码 ...
   const deltaTime = clock.getDelta();
-  const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
+  const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
   
   // 更新物理世界
   world.step(1 / 60, deltaTime, 3);
@@ -2515,7 +2515,7 @@ let previousTime = 0;
 
 function render() {
   const deltaTime = clock.getDelta(); // 1. 计算帧间隔时间
-  const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
+  const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
   // 2. 更新动画混合器
   if (mixer) {

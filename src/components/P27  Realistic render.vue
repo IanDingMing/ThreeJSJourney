@@ -251,7 +251,7 @@ onMounted(() => {
     if (!camera || !renderer || !controls) return;
 
     const deltaTime = clock.getDelta();
-    const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
+    const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
     // Animate meshes
     meshArray.forEach((mesh) => {});

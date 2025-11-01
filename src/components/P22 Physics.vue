@@ -314,7 +314,7 @@ onMounted(() => {
     if (!camera || !renderer || !controls || !world) return;
 
     const deltaTime = clock.getDelta();
-    const elapsedTime = clock.getElapsedTime(); //获取自创建时钟以来的时间
+    const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
     // Update physics world
     world.step(1 / 60, deltaTime, 3);

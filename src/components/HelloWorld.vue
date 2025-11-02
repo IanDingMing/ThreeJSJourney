@@ -22,59 +22,6 @@ import { getTextureUrl } from "@/utils/texturesUtils";
 import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
 import * as CANNON from "cannon-es";
 
-// 使用FontLoader加载字体
-const fontLoader = new FontLoader();
-
-// 使用TextureLoader加载纹理
-const loadingManager = new THREE.LoadingManager();
-loadingManager.onStart = () => {
-  // console.log("Loading started");
-};
-loadingManager.onLoad = () => {
-  // console.log("Loading complete");
-};
-loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-  console.log(
-    `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
-  );
-};
-loadingManager.onError = (url) => {
-  console.log(`There was an error loading ${url}`);
-};
-
-const texturesLoader = new THREE.TextureLoader(loadingManager);
-const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
-const rgbeLoader = new RGBELoader();
-// 加载纹理
-const environmentMapTexture = cubeTextureLoader.load([
-  getTextureUrl("environmentMaps/0/px.jpg"),
-  getTextureUrl("environmentMaps/0/nx.jpg"),
-  getTextureUrl("environmentMaps/0/py.jpg"),
-  getTextureUrl("environmentMaps/0/ny.jpg"),
-  getTextureUrl("environmentMaps/0/pz.jpg"),
-  getTextureUrl("environmentMaps/0/nz.jpg"),
-]);
-const environmentMapsPath = new URL(
-  "../assets/textures/environmentMaps/blender-2k.hdr",
-  import.meta.url
-).href; // src/assets/textures/environmentMaps/blender-2k.hdr
-const environmentMapsLightPath = new URL(
-  "../assets/textures/environmentMaps/blender-2k-light.hdr",
-  import.meta.url
-).href; // src/assets/textures/environmentMaps/blender-2k-light.hdr
-
-/**
- * Models
- */
-// 1. 初始化加载器
-const gltfLoader = new GLTFLoader();
-
-// 2. 定义模型路径（支持 gltf/glb 等格式）
-// const modelPath = `${
-//   import.meta.env.BASE_URL
-// }models/FlightHelmet/glTF/FlightHelmet.gltf`; // 文件路径：/public/models/Duck
-const modelPath = `${import.meta.env.BASE_URL}models/hamburger.glb`; // 文件路径：/public/models/Duck
-
 const sizes = {
   width: 800,
   height: 600,
@@ -124,23 +71,6 @@ const handleDoubleClick = () => {
   }
 };
 
-/**
- * Update all materials
- */
-const updateAllMaterials = (scene: THREE.Scene) => {
-  scene.traverse((child) => {
-    if (
-      child instanceof THREE.Mesh &&
-      child.material instanceof THREE.MeshStandardMaterial
-    ) {
-      child.material.envMapIntensity = global.envMapIntensity;
-      // child.material.needsUpdate = true;
-      child.castShadow = true;
-      child.receiveShadow = true;
-    }
-  });
-};
-
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
@@ -149,65 +79,21 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
-  environmentMapTexture.encoding = THREE.sRGBEncoding;
-  scene.background = environmentMapTexture;
-  scene.environment = environmentMapTexture;
 
   // 模型mesh==========================
-  // 3. 执行加载
-  gltfLoader.load(
-    modelPath,
-    // 加载成功回调
-    (gltf) => {
-      // 飞行员头盔
-      // gltf.scene.scale.set(10, 10, 10);
-      // gltf.scene.position.set(0, -4, 0);
-      // gltf.scene.rotation.y = Math.PI * 0.5;
-      // 汉堡
-      gltf.scene.scale.set(0.3, 0.3, 0.3);
-      gltf.scene.position.set(0, -1, 0);
-      gltf.scene.rotation.y = Math.PI * 0.5;
-      scene.add(gltf.scene);
-
-      modelFlightHelmet = gltf.scene;
-
-      updateAllMaterials(scene);
-    },
-    // 加载进度回调
-    (xhr) => {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    // 加载错误回调
-    (error) => {
-      console.error("加载失败：", error);
-    }
-  );
   /**
-   * Test sphere
+   * Test mesh
    */
-  const testSphere = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 32, 32),
-    new THREE.MeshStandardMaterial()
-  );
-  // scene.add(testSphere);
+  // Geometry
+  const geometry = new THREE.PlaneGeometry(1, 1, 32, 32);
+
+  // Material
+  const material = new THREE.MeshBasicMaterial();
+
+  // Mesh
+  const mesh = new THREE.Mesh(geometry, material);
+  scene.add(mesh);
   // 模型mesh==========================
-
-  /**
-   * Lights
-   */
-  const directionalLight = new THREE.DirectionalLight("#ffffff", Math.PI);
-  directionalLight.position.set(0.25, 3, -2.25);
-  directionalLight.castShadow = true;
-  directionalLight.shadow.camera.far = 15;
-  directionalLight.shadow.mapSize.set(1024, 1024);
-  directionalLight.shadow.normalBias = 0.05;
-  scene.add(directionalLight);
-
-  // 阴影相机辅助
-  const directionalLightCameraHelper = new THREE.CameraHelper(
-    directionalLight.shadow.camera
-  );
-  scene.add(directionalLightCameraHelper);
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
@@ -222,7 +108,7 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(4, 1, -4);
+  camera.position.set(0.25, -0.25, 1);
   scene.add(camera);
 
   // Controls
@@ -231,18 +117,9 @@ onMounted(() => {
 
   // 创建渲染器对象
   renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   // renderer.setClearColor(new THREE.Color("#262837")); //设置渲染器的背景颜色
-  console.log(renderer);
-  renderer.useLegacyLights = false;
-  renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.toneMapping = THREE.ReinhardToneMapping;
-  renderer.toneMappingExposure = 3;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   webgl.value!.appendChild(renderer.domElement);
 
@@ -270,27 +147,6 @@ onMounted(() => {
   // 创建GUI===================
   gui = new GUI();
 
-  gui.add(directionalLight, "intensity", 0, 10, 0.001).name("lightIntensity");
-  gui.add(directionalLight.position, "x", -5, 5, 0.001).name("lightX");
-  gui.add(directionalLight.position, "y", -5, 5, 0.001).name("lightY");
-  gui.add(directionalLight.position, "z", -5, 5, 0.001).name("lightZ");
-
-  modelFlightHelmet &&
-    gui
-      .add(modelFlightHelmet.rotation, "y", -Math.PI, Math.PI, 0.001)
-      .name("rotation");
-
-  gui
-    .add(global, "envMapIntensity", 0, 10, 0.001)
-    .onChange(() => updateAllMaterials(scene));
-  gui.add(renderer, "toneMapping", {
-    No: THREE.NoToneMapping,
-    Linear: THREE.LinearToneMapping,
-    Reinhard: THREE.ReinhardToneMapping,
-    Cineon: THREE.CineonToneMapping,
-    ACESFilmic: THREE.ACESFilmicToneMapping,
-  });
-  gui.add(renderer, "toneMappingExposure", 0, 10, 0.001);
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

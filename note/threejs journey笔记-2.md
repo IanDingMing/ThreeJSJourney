@@ -324,6 +324,282 @@ const diffuseMap = textureLoader.load('texture.jpg', (texture) => {
 
 
 
+## P29 Shaders
+
+### 1. 着色器基础概念
+
+#### 什么是着色器？
+
+- **着色器是运行在GPU上的程序**
+- 负责处理几何体的顶点位置和像素颜色
+- 分为**顶点着色器**和**片元着色器**
+
+#### 两种着色器的作用
+
+- **顶点着色器**：定位几何体的每个顶点
+- **片元着色器**：为几何体的所有可见像素着色
+
+### 2. Three.js 中的着色器材质
+
+#### 两种主要材质类型
+
+```javascript
+// 1. ShaderMaterial - 自动包含常用uniforms和attributes
+const material = new THREE.ShaderMaterial({
+  vertexShader: vertexShaderCode,
+  fragmentShader: fragmentShaderCode
+});
+
+// 2. RawShaderMaterial - 需要手动声明所有uniforms和attributes
+const material = new THREE.RawShaderMaterial({
+  vertexShader: vertexShaderCode,
+  fragmentShader: fragmentShaderCode
+});
+```
+
+
+
+### 3. 基础着色器示例
+
+#### 最简单的着色器实现
+
+```javascript
+// 几何体
+const geometry = new THREE.PlaneGeometry(1, 1, 32, 32);
+
+// 材质
+const material = new THREE.RawShaderMaterial({
+  vertexShader: `
+    uniform mat4 projectionMatrix;
+    uniform mat4 viewMatrix;
+    uniform mat4 modelMatrix;
+    attribute vec3 position;
+
+    void main(){
+      gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    precision mediump float;
+    void main(){
+      gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); // 红色
+    }
+  `,
+});
+
+// 网格
+const mesh = new THREE.Mesh(geometry, material);
+scene.add(mesh);
+```
+
+
+
+### 4. 着色器文件组织
+
+#### 分离GLSL文件
+
+```javascript
+// 使用Vite的静态资源处理
+import testVertexShader from "@/shaders/test/vertex.glsl?raw";
+import testFragmentShader from "@/shaders/test/fragment.glsl?raw";
+
+const material = new THREE.RawShaderMaterial({
+  vertexShader: testVertexShader,
+  fragmentShader: testFragmentShader
+});
+```
+
+
+
+### 5. 着色器语法详解
+
+#### 顶点着色器结构
+
+[为什么修改的是 `modelPosition`？](#为什么修改的是 `modelPosition`？)
+
+```glsl
+// vertex.glsl
+uniform mat4 projectionMatrix;  // 投影矩阵
+uniform mat4 viewMatrix;        // 视图矩阵
+uniform mat4 modelMatrix;       // 模型矩阵
+attribute vec3 position;        // 顶点位置
+attribute vec2 uv;              // UV坐标
+
+varying vec2 vUv;              // 传递给片元着色器的变量
+
+void main() {
+  vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+  
+  // 顶点动画示例
+  modelPosition.z = sin(modelPosition.x * 10.0) * 0.1;
+  
+  vec4 viewPosition = viewMatrix * modelPosition;
+  vec4 projectedPosition = projectionMatrix * viewPosition;
+
+  gl_Position = projectedPosition;
+  vUv = uv; // 传递UV坐标
+}
+```
+
+
+
+#### 片元着色器结构
+
+[`precision mediump float;` 是什么](#`precision mediump float;` 是什么)
+
+```glsl
+// fragment.glsl
+precision mediump float;        // 精度声明
+
+uniform vec3 uColor;           // 自定义颜色uniform
+uniform sampler2D uTexture;    // 纹理
+
+varying vec2 vUv;              // 从顶点着色器接收的变量
+
+void main() {
+  vec4 textureColor = texture2D(uTexture, vUv);
+  gl_FragColor = textureColor; // 输出最终颜色
+}
+```
+
+
+
+### 6. 数据传递技术
+
+#### 从JavaScript向着色器传递数据
+
+##### 1. Uniforms 传递
+
+```javascript
+const material = new THREE.RawShaderMaterial({
+  vertexShader: testVertexShader,
+  fragmentShader: testFragmentShader,
+  uniforms: {
+    uFrequency: { value: new THREE.Vector2(10, 5) },
+    uTime: { value: 0 },
+    uColor: { value: new THREE.Color("pink") },
+    uTexture: { value: flagTexture }
+  }
+});
+
+// 在动画循环中更新uniforms
+function animate() {
+  material.uniforms.uTime.value = elapsedTime;
+}
+```
+
+
+
+##### 2. Attributes 传递
+
+```javascript
+const geometry = new THREE.PlaneGeometry(1, 1, 32, 32);
+
+// 创建自定义属性
+const count = geometry.attributes.position.count;
+const randoms = new Float32Array(count);
+
+for (let i = 0; i < count; i++) {
+  randoms[i] = Math.random();
+}
+
+// 设置属性
+geometry.setAttribute("aRandom", new THREE.BufferAttribute(randoms, 1));
+```
+
+
+
+### 7. 进阶示例：飘动旗帜效果
+
+#### 顶点着色器（旗帜动画）
+
+```glsl
+uniform mat4 projectionMatrix;
+uniform mat4 viewMatrix;
+uniform mat4 modelMatrix;
+uniform vec2 uFrequency;
+uniform float uTime;
+
+attribute vec3 position;
+attribute vec2 uv;
+attribute float aRandom;
+
+varying vec2 vUv;
+varying float vElevation;
+
+void main() {
+  vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+
+  // 创建波浪效果
+  float elevation = sin(modelPosition.x * uFrequency.x - uTime) * 0.1;
+  elevation += sin(modelPosition.y * uFrequency.y - uTime) * 0.1;
+  modelPosition.z += elevation;
+
+  vec4 viewPosition = viewMatrix * modelPosition;
+  vec4 projectedPosition = projectionMatrix * viewPosition;
+
+  gl_Position = projectedPosition;
+  vUv = uv;
+  vElevation = elevation;
+}
+```
+
+
+
+#### 片元着色器（纹理+光照效果）
+
+```glsl
+precision mediump float;
+
+uniform vec3 uColor;
+uniform sampler2D uTexture;
+
+varying vec2 vUv;
+varying float vElevation;
+
+void main() {
+  vec4 textureColor = texture2D(uTexture, vUv);
+  
+  // 根据高度调整颜色亮度（模拟光照）
+  textureColor.rgb *= vElevation * 2.0 + 0.5;
+  
+  gl_FragColor = textureColor;
+}
+```
+
+
+
+### 8. 重要区别：RawShaderMaterial vs ShaderMaterial
+
+#### RawShaderMaterial
+
+- **需要手动声明所有uniforms和attributes**
+- 完全控制，但代码更冗长
+- 必须包含基础矩阵和精度声明
+
+#### ShaderMaterial
+
+- **自动包含常用uniforms和attributes**
+- 代码更简洁
+- Three.js自动处理基础功能
+
+#### 转换示例
+
+```glsl
+// RawShaderMaterial 需要
+uniform mat4 projectionMatrix;
+uniform mat4 viewMatrix;
+uniform mat4 modelMatrix;
+attribute vec3 position;
+precision mediump float;
+
+// ShaderMaterial 可以省略以上代码，Three.js会自动处理
+```
+
+
+
+
+
 
 
 
@@ -440,4 +716,191 @@ sRGB纹理 → [sRGB转线性] → 线性计算 → [线性转sRGB] → 显示�
 ------
 
 
+
+
+
+## `precision mediump float;` 是什么
+
+### 什么是精度限定符？
+
+精度限定符定义了浮点数在GPU中的存储和计算精度，影响性能和质量。
+
+### 三种精度级别
+
+```glsl
+// 高精度 - 32位浮点数，最精确但性能最低
+precision highp float;
+
+// 中精度 - 16位浮点数，平衡性能与质量
+precision mediump float;
+
+// 低精度 - 10位或更少，性能最高但精度最低
+precision lowp float;
+```
+
+
+
+### 为什么需要声明精度？
+
+- **移动设备兼容性**：有些设备要求显式声明精度
+- **性能优化**：低精度计算更快，功耗更低
+- **内存节省**：低精度变量占用更少内存
+
+### 实际应用场景
+
+```glsl
+// 片元着色器必须声明默认精度
+precision mediump float;
+
+uniform sampler2D uTexture;
+varying vec2 vUv;
+
+void main() {
+    // 颜色计算使用中精度足够
+    vec4 color = texture2D(uTexture, vUv);
+    gl_FragColor = color;
+}
+```
+
+------
+
+
+
+### 为什么修改的是 `modelPosition`？
+
+### 图形渲染的坐标系转换流程
+
+```text
+局部坐标 → 世界坐标 → 视图坐标 → 裁剪坐标 → 屏幕坐标
+    ↓         ↓         ↓          ↓          ↓
+ position → modelMatrix → viewMatrix → projectionMatrix → gl_Position
+```
+
+
+
+#### 坐标转换链分析
+
+```glsl
+void main() {
+    // 1. 局部坐标 → 世界坐标
+    vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+    
+    // ★ 在这里修改最合理！因为：
+    // - 仍然在世界坐标系中，便于理解
+    // - 不受相机视角影响
+    // - 可以基于世界坐标进行物理模拟
+    modelPosition.z += sin(modelPosition.x * 10.0) * 0.1;
+    
+    // 2. 世界坐标 → 视图坐标（相机空间）
+    vec4 viewPosition = viewMatrix * modelPosition;
+    
+    // 3. 视图坐标 → 裁剪坐标
+    vec4 projectedPosition = projectionMatrix * viewPosition;
+    
+    gl_Position = projectedPosition;
+}
+```
+
+
+
+### 各坐标系详解
+
+#### 1. 局部坐标 (Local Space / Model Space)
+
+```glsl
+// 顶点在模型自身的坐标系中的位置
+attribute vec3 position;  // 例如：(0, 0, 0) 表示模型中心
+```
+
+
+
+**特点**：
+
+- 相对于模型自身原点
+- 不知道模型在场景中的位置
+- 适合模型自身的变形动画
+
+#### 2. 世界坐标 (World Space)
+
+```glsl
+vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+```
+
+
+
+**modelMatrix 包含**：
+
+- 平移：物体在场景中的位置
+- 旋转：物体的朝向
+- 缩放：物体的大小
+
+**为什么在这里修改**：
+
+```glsl
+// 示例：基于世界坐标的波浪效果
+float wave = sin(modelPosition.x * frequency + time);
+modelPosition.y += wave * amplitude;
+
+// 这样修改的好处：
+// 1. 波浪基于世界位置，不受物体移动影响
+// 2. 多个物体可以共享相同的波浪参数
+// 3. 物理上更合理
+```
+
+
+
+#### 3. 视图坐标 (View Space / Camera Space)
+
+```glsl
+vec4 viewPosition = viewMatrix * modelPosition;
+```
+
+
+
+**viewMatrix 包含**：
+
+- 相机位置和朝向
+- 将世界坐标转换到以相机为原点的坐标系
+
+**为什么不在这里修改**：
+
+```glsl
+// 如果在视图坐标中修改：
+viewPosition.z += 1.0;  // 这会改变深度，但基于相机空间
+
+// 问题：
+// - 难以理解效果（相对于相机）
+// - 不便于物理模拟
+// - 相机移动时效果会变化
+```
+
+
+
+#### 4. 裁剪坐标 (Clip Space)
+
+```glsl
+vec4 projectedPosition = projectionMatrix * viewPosition;
+```
+
+
+
+**projectionMatrix 作用**：
+
+- 应用透视或正交投影
+- 将3D坐标映射到2D标准化设备坐标
+- 定义视锥体（可见范围）
+
+**绝对不要在这里修改**：
+
+```glsl
+// 错误示例：
+projectedPosition.x += 0.1;  // 这会破坏投影变换
+
+// 后果：
+// - 透视失真
+// - 深度测试错误
+// - 可能超出裁剪范围
+```
+
+------
 

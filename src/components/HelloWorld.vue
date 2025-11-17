@@ -24,25 +24,6 @@ import * as CANNON from "cannon-es";
 import testVertexShader from "@/shaders/test/vertex.glsl?raw";
 import testFragmentShader from "@/shaders/test/fragment.glsl?raw";
 
-const loadingManager = new THREE.LoadingManager();
-loadingManager.onStart = () => {
-  console.log("Loading started");
-};
-loadingManager.onLoad = () => {
-  console.log("Loading complete");
-};
-loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-  console.log(
-    `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
-  );
-};
-loadingManager.onError = (url) => {
-  console.log(`There was an error loading ${url}`);
-};
-
-const texturesLoader = new THREE.TextureLoader(loadingManager);
-const flagTextures = texturesLoader.load(getTextureUrl("flag-french.jpg"));
-
 const sizes = {
   width: 800,
   height: 600,
@@ -102,40 +83,22 @@ onMounted(() => {
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 模型mesh==========================
+
   /**
    * Test mesh
    */
   // Geometry
   const geometry = new THREE.PlaneGeometry(1, 1, 32, 32);
 
-  const count = geometry.attributes.position.count;
-  const randoms = new Float32Array(count);
-
-  for (let index = 0; index < count; index++) {
-    randoms[index] = Math.random();
-  }
-
-  geometry.setAttribute("aRandom", new THREE.BufferAttribute(randoms, 1));
-
-  console.log(geometry, randoms);
   // Material
   const material = new THREE.ShaderMaterial({
     vertexShader: testVertexShader,
     fragmentShader: testFragmentShader,
-    uniforms: {
-      uFrequency: { value: new THREE.Vector2(10, 5) },
-      uTime: { value: 0 },
-      uColor: { value: new THREE.Color("pink") },
-      uTexture: { value: flagTextures },
-    },
-    wireframe: false,
-    transparent: true,
     side: THREE.DoubleSide,
   });
 
   // Mesh
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.scale.y = 2 / 3;
   scene.add(mesh);
   // 模型mesh==========================
 
@@ -174,9 +137,6 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
-    // Update control
-    material.uniforms.uTime.value = elapsedTime;
-
     // Animate meshes
     meshArray.forEach((mesh) => {});
 
@@ -194,12 +154,6 @@ onMounted(() => {
   // 创建GUI===================
   gui = new GUI();
 
-  gui
-    .add(material.uniforms.uFrequency.value, "x", 0, 20, 0.01)
-    .name("frequencyX");
-  gui
-    .add(material.uniforms.uFrequency.value, "y", 0, 20, 0.01)
-    .name("frequencyY");
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

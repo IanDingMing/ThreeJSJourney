@@ -85,21 +85,18 @@ onMounted(() => {
   // 模型mesh==========================
 
   /**
-   * Test mesh
+   * Water
    */
   // Geometry
-  const geometry = new THREE.PlaneGeometry(1, 1, 32, 32);
+  const waterGeometry = new THREE.PlaneGeometry(2, 2, 128, 128);
 
   // Material
-  const material = new THREE.ShaderMaterial({
-    vertexShader: testVertexShader,
-    fragmentShader: testFragmentShader,
-    side: THREE.DoubleSide,
-  });
+  const waterMaterial = new THREE.MeshBasicMaterial();
 
   // Mesh
-  const mesh = new THREE.Mesh(geometry, material);
-  scene.add(mesh);
+  const water = new THREE.Mesh(waterGeometry, waterMaterial);
+  water.rotation.x = -Math.PI * 0.5;
+  scene.add(water);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -116,6 +113,7 @@ onMounted(() => {
     100
   );
   camera.position.set(0.25, -0.25, 1);
+  camera.position.set(1, 1, 1);
   scene.add(camera);
 
   // Controls

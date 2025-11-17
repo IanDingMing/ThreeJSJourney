@@ -598,6 +598,198 @@ precision mediump float;
 
 
 
+## P30 Shaders patterns
+
+### 1. 预定义
+
+```glsl
+#define PI 3.14159265358979323846
+varying vec2 vUv;  // 纹理坐标变量
+```
+
+**核心工具函数：**
+
+- `random(vec2)`: 伪随机数生成器（基于哈希函数）
+
+[random代码](#random代码)
+
+- `rotate(vec2, float, vec2)`: 2D坐标旋转
+
+[rotate代码](#rotate代码)
+
+- `cnoise(vec2)`: 2D Perlin噪声生成器
+
+[Classic Perlin 2D Noise ](#Classic Perlin 2D Noise )
+
+
+
+### 2. Pattern 详解
+
+![](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-2/P30 Shaders patterns/patterns3.png)
+
+***<u>更多Pattern图片参考本地图像，如图上地址相同文件夹中：note/images-2/P30 Shaders patterns/</u>***
+
+#### 基础渐变模式 (Pattern 3-5)
+
+```glsl
+// Pattern 3: 水平渐变
+float strength = vUv.x;
+
+// Pattern 4: 垂直渐变  
+float strength = vUv.y;
+
+// Pattern 5: 反向垂直渐变
+float strength = 1.0 - vUv.y;
+```
+
+
+
+#### 条纹模式 (Pattern 6-15)
+
+```glsl
+// Pattern 6-7: 连续条纹
+float strength = vUv.y * 10.0;                    // 放大y坐标
+float strength = mod(vUv.y * 10.0, 1.0);          // 取模形成重复条纹
+
+// Pattern 8-10: 二值化条纹
+float strength = step(.5, mod(vUv.y * 10.0, 1.0)); // step函数实现硬边
+
+// Pattern 11: 网格叠加
+float strength = strength1 + strength2;           // 水平和垂直条纹相加
+```
+
+**关键函数解析：**
+
+- `mod(x, y)`: 取模运算，实现重复模式
+- `step(edge, x)`: 阶梯函数，x≥edge返回1，否则返回0
+
+
+
+#### 距离相关模式 (Pattern 16-40)
+
+```glsl
+// Pattern 16-18: 绝对距离
+float strength = abs(vUv.x - .5);                 // 到中心x轴距离
+float strength = min(strength1, strength2);       // 最小距离（菱形）
+float strength = max(strength1, strength2);       // 最大距离（方形）
+
+// Pattern 27-30: 欧氏距离
+float strength = length(vUv);                     // 到原点距离
+float strength = distance(vUv, vec2(.5));         // 到中心距离
+float strength = .015 / distance(vUv, vec2(.5));  // 反比距离（光晕效果）
+```
+
+**距离计算要点：**
+
+- `length(v)`: 计算向量长度
+- `distance(a, b)`: 等价于 `length(a - b)`
+- 使用减法是因为距离的数学定义基于向量差
+
+[Pattern 28这两种区别在哪里，为什么使用length是减呢，不应该是加吗](#Pattern 28这两种区别在哪里，为什么使用length是减呢，不应该是加吗)
+
+#### 离散化模式 (Pattern 21-26)
+
+```glsl
+// Pattern 21-22: 离散化网格
+float strength = floor(vUv.x * 10.0) / 10.0;      // x轴离散化
+float strength = strength1 * strength2;           // 网格效果
+
+// Pattern 23-26: 随机化
+float strength = random(vUv);                     // 连续随机
+float strength = random(gridUv);                  // 网格随机
+```
+
+
+
+#### 角度相关模式 (Pattern 41-46)
+
+```glsl
+// Pattern 41-43: 角度计算和归一化
+float angle = atan(vUv.x - .5, vUv.y - .5);       // 相对于中心的角度
+angle /= PI * 2.0; angle += .5;                   // 归一化到[0,1]
+
+// Pattern 44-46: 角度变形
+angle *= 20.0; angle = mod(angle, 1.0);           // 径向条纹
+angle = sin(angle * 100.0);                       // 径向正弦波
+```
+
+**atan函数详解：**
+
+- `atan(y, x)`: 计算从正x轴到向量(x,y)的角度
+- 范围：[-π, π]弧度
+- 归一化技巧：`÷2π + 0.5` 将范围映射到[0,1]
+
+[float angle = atan(vUv.x, vUv.y)详解](#float angle = atan(vUv.x, vUv.y)详解)
+
+[Pattern 42 和 Pattern 43  的区别详解](#Pattern 42 和 Pattern 43  的区别详解)
+
+#### 噪声模式 (Pattern 47-51)
+
+```glsl
+// Pattern 47-50: Perlin噪声应用
+float strength = cnoise(vUv * 10.0);              // 基础噪声
+float strength = step(.0, cnoise(vUv * 10.0));    // 噪声二值化
+float strength = sin(cnoise(vUv * 10.0) * 20.0);  // 噪声变形
+
+// Pattern 51: 高级噪声应用
+float strength = step(.9, sin(cnoise(vUv * 10.0) * 20.0));
+```
+
+
+
+### 3. 核心概念解析
+
+#### Clamp the strength
+
+```glsl
+strength = clamp(strength, .0, 1.0);
+```
+
+- **作用**: 将strength值限制在[0,1]范围内
+- **必要性**: 确保颜色值合法，避免超出显示范围
+- **clamp(x, min, max)**: 返回限制在min-max范围内的x值
+
+
+
+#### Colored version vs Black and white version
+
+```glsl
+// 彩色版本：基于UV坐标的混合颜色
+vec3 blackColor = vec3(.0);
+vec3 uvColor = vec3(vUv, 1.0);        // RGB = (u, v, 1.0)
+vec3 mixedColor = mix(blackColor, uvColor, strength);
+
+// 黑白版本：直接使用strength作为灰度
+gl_FragColor = vec4(vec3(strength), 1.0);
+```
+
+**mix函数**: `mix(a, b, t) = a*(1-t) + b*t` 线性插值
+
+
+
+### 5. 重要函数总结
+
+#### 数学函数
+
+- `mod()`: 模运算，创建重复模式
+- `step()`: 二值化，创建硬边效果
+- `floor()`: 向下取整，用于离散化
+- `abs()`: 绝对值，用于对称效果
+- `min()/max()`: 最小值/最大值运算
+- `sin()/cos()`: 三角函数，创建波形
+
+#### 几何函数
+
+- `length()`: 向量长度
+- `distance()`: 两点距离
+- `atan()`: 反正切，计算角度
+
+#### 工具函数
+
+- `random()`: 伪随机数生成
+- `rotate()`: 坐标旋转
+- `cnoise()`: Perlin噪声生成
+
 
 
 
@@ -901,6 +1093,192 @@ projectedPosition.x += 0.1;  // 这会破坏投影变换
 // - 深度测试错误
 // - 可能超出裁剪范围
 ```
+
+------
+
+
+
+## random代码
+
+```
+// 假随机数，因为刷新并不会更新随机值
+float random(vec2 st) {
+  return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+```
+
+------
+
+
+
+## rotate代码
+
+```
+vec2 rotate(vec2 uv, float rotation, vec2 mid) {
+  return vec2(cos(rotation) * (uv.x - mid.x) + sin(rotation) * (uv.y - mid.y) + mid.x, cos(rotation) * (uv.y - mid.y) - sin(rotation) * (uv.x - mid.x) + mid.y);
+}
+```
+
+------
+
+## Classic Perlin 2D Noise 
+
+[来源网站，但是有可能打不开](https://gist.github.com/patriciogonzalezvivo/670c22f3966e662d2f83)
+
+```
+//	Classic Perlin 2D Noise 
+//	by Stefan Gustavson
+//
+vec4 permute(vec4 x) {
+  return mod(((x * 34.0) + 1.0) * x, 289.0);
+}
+
+vec2 fade(vec2 t) {
+  return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+float cnoise(vec2 P) {
+  vec4 Pi = floor(P.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);
+  vec4 Pf = fract(P.xyxy) - vec4(0.0, 0.0, 1.0, 1.0);
+  Pi = mod(Pi, 289.0); // To avoid truncation effects in permutation
+  vec4 ix = Pi.xzxz;
+  vec4 iy = Pi.yyww;
+  vec4 fx = Pf.xzxz;
+  vec4 fy = Pf.yyww;
+  vec4 i = permute(permute(ix) + iy);
+  vec4 gx = 2.0 * fract(i * 0.0243902439) - 1.0; // 1/41 = 0.024...
+  vec4 gy = abs(gx) - 0.5;
+  vec4 tx = floor(gx + 0.5);
+  gx = gx - tx;
+  vec2 g00 = vec2(gx.x, gy.x);
+  vec2 g10 = vec2(gx.y, gy.y);
+  vec2 g01 = vec2(gx.z, gy.z);
+  vec2 g11 = vec2(gx.w, gy.w);
+  vec4 norm = 1.79284291400159 - 0.85373472095314 * vec4(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11));
+  g00 *= norm.x;
+  g01 *= norm.y;
+  g10 *= norm.z;
+  g11 *= norm.w;
+  float n00 = dot(g00, vec2(fx.x, fy.x));
+  float n10 = dot(g10, vec2(fx.y, fy.y));
+  float n01 = dot(g01, vec2(fx.z, fy.z));
+  float n11 = dot(g11, vec2(fx.w, fy.w));
+  vec2 fade_xy = fade(Pf.xy);
+  vec2 n_x = mix(vec2(n00, n01), vec2(n10, n11), fade_xy.x);
+  float n_xy = mix(n_x.x, n_x.y, fade_xy.y);
+  return 2.3 * n_xy;
+}
+```
+
+
+
+------
+
+## Pattern 28这两种区别在哪里，为什么使用length是减呢，不应该是加吗
+
+这两种写法在功能上**完全等价**，没有本质区别，最终都会计算`vUv`到中心点`(0.5, 0.5)`的欧氏距离。至于为什么用 “减” 而不是 “加”，核心是由 “距离的数学定义” 决定的。
+
+### 1. 先明确两个函数的关系
+
+GLSL 中：
+
+- `distance(a, b)` 是专门计算两点距离的内置函数，其底层实现就是 `length(a - b)`（即先求两点的向量差，再计算该向量的长度）。
+- `length(v)` 是计算向量`v`长度的函数（对二维向量而言，就是`sqrt(v.x² + v.y²)`）。
+
+因此，`distance(vUv, vec2(0.5))` 等价于 `length(vUv - vec2(0.5))`。你代码中写的 `length(vUv - .5)` 其实是简写 —— 因为`vUv`是`vec2`类型（二维向量），`.5`会被**隐式转换**为`vec2(0.5, 0.5)`，所以和`length(vUv - vec2(0.5))`完全一样。
+
+### 2. 为什么是 “减” 而不是 “加”？
+
+距离的本质是 “两点之间的直线长度”，数学上需要通过**向量差**计算：
+
+假设`vUv`是点`A(x1, y1)`，中心点是`B(0.5, 0.5)`，那么：
+
+- 从`B`到`A`的向量是 `A - B = (x1 - 0.5, y1 - 0.5)`（向量减法）；
+- 这个向量的长度（即`A`到`B`的距离）就是 `sqrt((x1-0.5)² + (y1-0.5)²)`，也就是`length(A - B)`。
+
+如果用 “加”（`A + B`），得到的向量是`(x1+0.5, y1+0.5)`，其长度和 “两点距离” 毫无关系（比如两点重合时，加法结果的长度是`sqrt(0.5² + 0.5²)`，显然不是 0）。
+
+------
+
+
+
+## float angle = atan(vUv.x, vUv.y)详解
+
+这行代码用于计算**纹理坐标点`vUv`相对于原点`(0,0)`的角度**，具体含义和细节如下：
+
+### 1. `atan()`双参数版本的作用
+
+GLSL 中的`atan(y, x)`是双参数反正切函数（等价于数学中的`atan2(y, x)`），用于计算**从正 x 轴到向量`(x, y)`的角度**（极坐标中的角度`θ`），返回值是弧度，范围通常为`[-π, π]`（即`[-180°, 180°]`）。
+
+但你这里的参数是`atan(vUv.x, vUv.y)`，即**第一个参数是`x`，第二个参数是`y`**，相当于计算的是`atan2(x, y)`，角度的参考轴会发生变化：
+
+- 此时角度是**从正 y 轴开始计算**的（而非正 x 轴），逆时针旋转为正方向。
+
+### 2. 结合`vUv`的具体含义
+
+`vUv`是纹理坐标（`vec2`类型），`vUv.x`是水平分量（x 轴），`vUv.y`是垂直分量（y 轴），默认范围通常是`[0, 1]`（即点`vUv`位于以`(0,0)`为左下角、`(1,1)`为右上角的单位矩形内）。
+
+因此，`atan(vUv.x, vUv.y)`的本质是：计算从原点`(0,0)`到当前纹理坐标点`(vUv.x, vUv.y)`的向量，与**正 y 轴**之间的夹角（逆时针为正）。
+
+### 3. 举例理解角度范围
+
+假设`vUv`在单位矩形内（`x,y ∈ [0,1]`），几个典型点的角度如下：
+
+- 当`vUv = (0, 1)`（正上方）：向量是`(0,1)`，与正 y 轴同向，角度`angle = 0`；
+- 当`vUv = (1, 1)`（右上方）：向量是`(1,1)`，从正 y 轴逆时针转 45°，角度`angle = π/4`（45°）；
+- 当`vUv = (1, 0)`（正右方）：向量是`(1,0)`，从正 y 轴逆时针转 90°，角度`angle = π/2`（90°）；
+- 当`vUv = (0, 0)`（原点）：向量为零，角度无意义（通常返回 0 或未定义，需避免）。
+
+### 关键区别：参数顺序的影响
+
+- 标准`atan(y, x)`（即`atan2(y, x)`）：角度参考正 x 轴，常用于极坐标转换（`x = r·cosθ, y = r·sinθ`）；
+- 你这里的`atan(x, y)`：角度参考正 y 轴，适合需要以垂直方向为基准的旋转计算（比如模拟径向对称的纹理，如漩涡、雷达扫描线等）。
+
+总之，这行代码的核心是**获取纹理坐标点相对于原点的 “方向角”**，具体参考轴由参数顺序决定，常用于生成旋转对称的视觉效果（如环形渐变、扇形分区等）。
+
+------
+
+
+
+## Pattern 42 和 Pattern 43  的区别详解
+
+这两个模式的核心区别在于对角度值的**范围处理**：Pattern 42 直接使用原始角度值，而 Pattern 43 通过数学变换将角度归一化到`[0, 1]`范围，更适合作为 “强度值”（如颜色、透明度等）使用。
+
+### 先明确共同的起点：角度的原始范围
+
+两行代码的第一句都是：`float angle = atan(vUv.x - .5, vUv.y - .5);`
+
+这里的`vUv.x - .5`和`vUv.y - .5`是将纹理坐标从 “以`(0,0)`为原点” 转换为 “以`(0.5, 0.5)`为中心点”（即纹理中心），因此`angle`计算的是**当前像素到纹理中心的向量，与正 y 轴的夹角**（参考之前对`atan`的解释）。
+
+这个原始`angle`的取值范围是 **`[-π, π]`**（约`[-3.14, 3.14]`弧度），对应从正 y 轴顺时针旋转 180° 到逆时针旋转 180° 的全范围。
+
+### Pattern 42：直接使用原始角度作为`strength`
+
+```
+float strength = angle;
+```
+
+此时`strength`的范围和`angle`一致，即`[-π, π]`（约`[-3.14, 3.14]`）。
+
+在着色器中，颜色 / 强度值通常需要在`[0, 1]`范围内（超出部分会被截断为 0 或 1），因此这个`strength`直接用于颜色时会出现问题：
+
+- 负值部分（`[-π, 0)`）会被当作 0 处理；
+- 正值部分（`[0, π]`）中，超过 1 的部分（约`[1, 3.14]`）会被当作 1 处理；
+- 最终视觉上会丢失大部分角度信息，只保留`[0, 1]`区间内的微弱变化，效果不直观。
+
+### Pattern 43：将角度归一化到`[0, 1]`范围
+
+通过两步转换：
+
+1. `angle /= PI * 2.0;`原始角度范围`[-π, π]`除以`2π`后，范围变为`[-0.5, 0.5]`（因为`π/(2π)=0.5`，`-π/(2π)=-0.5`）。
+2. `angle += .5;`加上 0.5 后，范围从`[-0.5, 0.5]`偏移到`[0, 1]`。
+
+最终`strength = angle`的范围是 **`[0, 1]`**，完美匹配着色器中颜色 / 强度的常用范围。
+
+### 两者的视觉效果差异
+
+- Pattern 42：由于原始角度范围超出`[0,1]`，直接显示会导致大部分区域颜色相同（被截断），只能看到角度在`[-1, 1]`附近的微弱变化，效果混乱。
+- Pattern 43：角度被均匀映射到`[0,1]`，从纹理中心看，角度变化会对应`strength`从 0 到 1 的平滑过渡（例如：正上方为 0，顺时针旋转到正右方为 0.25，正下方为 0.5，正左方为 0.75，回到正上方为 1），适合生成环形渐变、雷达扫描线等有规律的径向效果。
 
 ------
 

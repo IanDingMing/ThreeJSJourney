@@ -85,43 +85,102 @@ onMounted(() => {
   // 模型mesh==========================
 
   /**
-   * Water
+   * Galaxy
    */
-  // Geometry
-  const waterGeometry = new THREE.PlaneGeometry(2, 2, 128, 128);
-
-  // Color
-  const debugObject = {
-    depthColor: "#0000ff",
-    sufaceColor: "#8888ff",
+  const parameters = {
+    count: 200000,
+    size: 0.005,
+    radius: 5,
+    branches: 3,
+    spin: 1,
+    randomness: 0.5,
+    randomnessPower: 3,
+    insideColor: "#ff6030",
+    outsideColor: "#1b3984",
   };
 
-  // Material
-  const waterMaterial = new THREE.ShaderMaterial({
-    vertexShader: waterVertexShader,
-    fragmentShader: waterFragmentShader,
-    uniforms: {
-      uTime: { value: 0 },
-      uBigWavesElevation: { value: 0.2 },
-      uBigWavesFrenquency: { value: new THREE.Vector2(4, 1.5) },
-      uBigWavesSpeed: { value: 0.75 },
+  let geometry: THREE.BufferGeometry | null = null;
+  let material: THREE.Material | null = null;
+  let points: THREE.Points | null = null;
 
-      uSmallWavesElevation: { value: 0.15 },
-      uSmallWavesFrequency: { value: 3 },
-      uSmallWavesSpeed: { value: 0.2 },
-      uSmallIterations: { value: 4 },
+  const generateGalaxy = () => {
+    if (points !== null) {
+      geometry && geometry.dispose();
+      material && material.dispose();
+      scene.remove(points);
+    }
 
-      uDepthColor: { value: new THREE.Color(debugObject.depthColor) },
-      uSufaceColor: { value: new THREE.Color(debugObject.sufaceColor) },
-      uColorOffset: { value: 0.25 },
-      uColorMultiplier: { value: 2 },
-    },
-  });
+    /**
+     * Geometry
+     */
+    geometry = new THREE.BufferGeometry();
 
-  // Mesh
-  const water = new THREE.Mesh(waterGeometry, waterMaterial);
-  water.rotation.x = -Math.PI * 0.5;
-  scene.add(water);
+    const positions = new Float32Array(parameters.count * 3);
+    const colors = new Float32Array(parameters.count * 3);
+
+    const insideColor = new THREE.Color(parameters.insideColor);
+    const outsideColor = new THREE.Color(parameters.outsideColor);
+
+    for (let i = 0; i < parameters.count; i++) {
+      const i3 = i * 3;
+
+      // Position
+      const radius = Math.random() * parameters.radius;
+
+      const branchAngle =
+        ((i % parameters.branches) / parameters.branches) * Math.PI * 2;
+
+      const randomX =
+        Math.pow(Math.random(), parameters.randomnessPower) *
+        (Math.random() < 0.5 ? 1 : -1) *
+        parameters.randomness *
+        radius;
+      const randomY =
+        Math.pow(Math.random(), parameters.randomnessPower) *
+        (Math.random() < 0.5 ? 1 : -1) *
+        parameters.randomness *
+        radius;
+      const randomZ =
+        Math.pow(Math.random(), parameters.randomnessPower) *
+        (Math.random() < 0.5 ? 1 : -1) *
+        parameters.randomness *
+        radius;
+
+      positions[i3] = Math.cos(branchAngle) * radius + randomX;
+      positions[i3 + 1] = randomY;
+      positions[i3 + 2] = Math.sin(branchAngle) * radius + randomZ;
+
+      // Color
+      const mixedColor = insideColor.clone();
+      mixedColor.lerp(outsideColor, radius / parameters.radius);
+
+      colors[i3] = mixedColor.r;
+      colors[i3 + 1] = mixedColor.g;
+      colors[i3 + 2] = mixedColor.b;
+    }
+
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    /**
+     * Material
+     */
+    material = new THREE.PointsMaterial({
+      size: parameters.size,
+      sizeAttenuation: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexColors: true,
+    });
+
+    /**
+     * Points
+     */
+    points = new THREE.Points(geometry, material);
+    scene.add(points);
+  };
+
+  generateGalaxy();
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -137,8 +196,9 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(0.25, -0.25, 1);
-  camera.position.set(1, 1, 1);
+  camera.position.x = 3;
+  camera.position.y = 3;
+  camera.position.z = 3;
   scene.add(camera);
 
   // Controls
@@ -160,9 +220,6 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
-    // Update water
-    waterMaterial.uniforms.uTime.value = elapsedTime;
-
     // Animate meshes
     meshArray.forEach((mesh) => {});
 
@@ -181,49 +238,37 @@ onMounted(() => {
   gui = new GUI();
 
   gui
-    .add(waterMaterial.uniforms.uBigWavesElevation, "value", 0, 1, 0.001)
-    .name("uBigWavesElevation");
+    .add(parameters, "count")
+    .min(100)
+    .max(1000000)
+    .step(100)
+    .onFinishChange(generateGalaxy);
   gui
-    .add(waterMaterial.uniforms.uBigWavesFrenquency.value, "x", 0, 10, 0.001)
-    .name("uBigWavesFrenquencyX");
+    .add(parameters, "radius")
+    .min(0.01)
+    .max(20)
+    .step(0.01)
+    .onFinishChange(generateGalaxy);
   gui
-    .add(waterMaterial.uniforms.uBigWavesFrenquency.value, "y", 0, 10, 0.001)
-    .name("uBigWavesFrenquencyY");
+    .add(parameters, "branches")
+    .min(2)
+    .max(20)
+    .step(1)
+    .onFinishChange(generateGalaxy);
   gui
-    .add(waterMaterial.uniforms.uBigWavesSpeed, "value", 0, 4, 0.001)
-    .name("uBigWavesSpeed");
-
+    .add(parameters, "randomness")
+    .min(0)
+    .max(2)
+    .step(0.001)
+    .onFinishChange(generateGalaxy);
   gui
-    .add(waterMaterial.uniforms.uSmallWavesElevation, "value", 0, 1, 0.001)
-    .name("uSmallWavesElevation");
-  gui
-    .add(waterMaterial.uniforms.uSmallWavesFrequency, "value", 0, 30, 0.001)
-    .name("uSmallWavesFrequency");
-  gui
-    .add(waterMaterial.uniforms.uSmallWavesSpeed, "value", 0, 4, 0.001)
-    .name("uSmallWavesSpeed");
-  gui
-    .add(waterMaterial.uniforms.uSmallIterations, "value", 0, 5, 1)
-    .name("uSmallIterations");
-
-  gui
-    .addColor(debugObject, "depthColor")
-    .name("depthColor")
-    .onChange(() => {
-      waterMaterial.uniforms.uDepthColor.value.set(debugObject.depthColor);
-    });
-  gui
-    .addColor(debugObject, "sufaceColor")
-    .name("sufaceColor")
-    .onChange(() => {
-      waterMaterial.uniforms.uSufaceColor.value.set(debugObject.sufaceColor);
-    });
-  gui
-    .add(waterMaterial.uniforms.uColorOffset, "value", 0, 1, 0.001)
-    .name("uColorOffset");
-  gui
-    .add(waterMaterial.uniforms.uColorMultiplier, "value", 0, 10, 0.001)
-    .name("uColorMultiplier");
+    .add(parameters, "randomnessPower")
+    .min(1)
+    .max(10)
+    .step(0.001)
+    .onFinishChange(generateGalaxy);
+  gui.addColor(parameters, "insideColor").onFinishChange(generateGalaxy);
+  gui.addColor(parameters, "outsideColor").onFinishChange(generateGalaxy);
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

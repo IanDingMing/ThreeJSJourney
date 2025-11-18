@@ -792,11 +792,126 @@ gl_FragColor = vec4(vec3(strength), 1.0);
 
 
 
+## P31 Raging sea
+
+### 1. **着色器材质系统**
+
+```typescript
+const waterMaterial = new THREE.ShaderMaterial({
+  vertexShader: waterVertexShader,    // 顶点着色器：处理几何变形
+  fragmentShader: waterFragmentShader, // 片元着色器：处理颜色渲染
+  uniforms: { /* 控制参数 */ }         // 桥梁：JS ↔ GLSL数据传递
+});
+```
+
+- 使用自定义的GLSL着色器替代标准材质
+- 通过uniforms传递JavaScript参数到着色器
 
 
 
+### 2. **波浪生成原理**
+
+#### 大波浪 - 正弦波叠加
+
+```glsl
+float elevation = sin(
+  modelPosition.x * uBigWavesFrenquency.x + uTime * uBigWavesSpeed
+) * sin(
+  modelPosition.z * uBigWavesFrenquency.y + uTime * uBigWavesSpeed
+) * uBigWavesElevation;
+```
+
+- **数学原理**: 两个方向的正弦波相乘产生交错波浪
+- **参数控制**:
+  - `uBigWavesFrequency`: 控制X和Z方向的波浪密度
+  - `uBigWavesSpeed`: 控制波浪移动速度
+  - `uBigWavesElevation`: 控制波浪高度
 
 
+
+#### 小波浪 - 3D柏林噪声
+
+[2D噪声和3D噪声的区别是什么？](#2D噪声 vs 3D噪声)
+
+```glsl
+for(float i = 1.0; i <= uSmallIterations; i++) {
+  elevation -= abs(cnoise(vec3(modelPosition.xz * uSmallWavesFrequency * i, uTime * uSmallWavesSpeed)) * uSmallWavesElevation / i);
+}
+```
+
+**参数作用详解**：
+
+- `uSmallIterations`：噪声叠加次数
+  - 1次：基础噪声
+  - 2次：基础噪声 + 更密集的细节噪声
+  - 3次：基础 + 密集 + 更密集的细节
+  - 类似Photoshop中的图层叠加
+- `uSmallWavesFrequency`：噪声频率
+  - 控制噪声图案的"缩放"
+  - 数值越大，噪声图案越小越密集
+- `uSmallWavesSpeed`：噪声变化速度
+  - 控制噪声图案随时间变化的快慢
+  - 让水面看起来有细微的动态变化
+- `uSmallWavesElevation`：噪声震动幅度，类似offset
+  - 控制噪声对水面高度的**影响程度**
+  - 类似调节音量大小
+
+**分形噪声技巧**：
+
+```glsl
+// 频率倍增：每层频率都加倍，产生更细的细节
+modelPosition.xz * uSmallWavesFrequency * i
+
+// 振幅衰减：高频层的影响逐渐减小，避免过于杂乱
+uSmallWavesElevation / i
+```
+
+
+
+### 3. **颜色混合系统**
+
+```glsl
+float mixStrength = (vElevation + uColorOffset) * uColorMultiplier;
+vec3 color = mix(uDepthColor, uSufaceColor, mixStrength);
+```
+
+[这里的`vElevation`是什么，为什么用它？](#什么是 `vElevation`？)
+
+[为什么使用 `(vElevation + uColorOffset) * uColorMultiplier`？](#为什么使用 `(vElevation + uColorOffset) * uColorMultiplier`？)
+
+
+
+### 4. **GLSL数据类型重要问题**
+
+#### 向量与整数的运算错误
+
+```glsl
+// ❌ 错误代码 - 不能将向量与整数直接相乘
+modelPosition.xz * 3.0 * i  // i是int，modelPosition.xz是vec2
+
+// ✅ 正确解决方案
+modelPosition.xz * uSmallWavesFrequency * float(i)
+```
+
+**原因**: GLSL是强类型语言，不允许混合类型运算，需要显式类型转换。
+
+
+
+### 5. **Three.js对象引用管理**
+
+#### 颜色更新的正确方式
+
+```typescript
+// ✅ 正确：使用.set()方法更新现有对象
+waterMaterial.uniforms.uDepthColor.value.set(debugObject.depthColor);
+
+// ❌ 错误：直接赋值会破坏引用
+waterMaterial.uniforms.uDepthColor.value = new THREE.Color(newColor);
+```
+
+
+
+## P32 
 
 
 
@@ -1279,6 +1394,66 @@ float strength = angle;
 
 - Pattern 42：由于原始角度范围超出`[0,1]`，直接显示会导致大部分区域颜色相同（被截断），只能看到角度在`[-1, 1]`附近的微弱变化，效果混乱。
 - Pattern 43：角度被均匀映射到`[0,1]`，从纹理中心看，角度变化会对应`strength`从 0 到 1 的平滑过渡（例如：正上方为 0，顺时针旋转到正右方为 0.25，正下方为 0.5，正左方为 0.75，回到正上方为 1），适合生成环形渐变、雷达扫描线等有规律的径向效果。
+
+------
+
+## 2D噪声 vs 3D噪声
+
+| 类型       | 输入        | 输出       | 应用场景             | 特点                   |
+| :--------- | :---------- | :--------- | :------------------- | :--------------------- |
+| **2D噪声** | (x,y)坐标   | 单一高度值 | 地形高度图、平面纹理 | 只能表现**表面**       |
+| **3D噪声** | (x,y,z)坐标 | 空间密度值 | 云朵、烟雾、洞穴     | 表现**体积**和内部结构 |
+
+**通俗理解**：
+
+- 2D噪声就像在纸上画画，只有表面
+- 3D噪声就像雕刻石头，有厚度和内部结构
+
+------
+
+
+
+## 什么是 `vElevation`？
+
+`vElevation` 是从顶点着色器传递到片元着色器的**水面高度数据**：
+
+- 每个顶点都有不同的高度值
+- 波峰处值较大，波谷处值较小
+- 通过这个高度变化来决定颜色：高处用表面色，低处用深水色
+
+------
+
+
+
+## 为什么使用 `(vElevation + uColorOffset) * uColorMultiplier`？
+
+**问题背景**: 原始高程值范围很小（如[-0.2, 0.2]），直接混合颜色变化不明显。
+
+**解决方案分析**:
+
+- **先加后乘 vs 先乘后加**:
+
+  glsl
+
+  ```glsl
+  // 方案A：先加后乘（作者选择）
+  (vElevation + uColorOffset) * uColorMultiplier
+  
+  // 方案B：先乘后加  
+  vElevation * uColorMultiplier + uColorOffset
+  ```
+
+**为什么选择方案A**:
+
+1. **物理意义更清晰**:
+   - `uColorOffset`: 确定颜色开始变化的基准点（相当于"海平面"调整）
+   - `uColorMultiplier`: 控制颜色过渡的剧烈程度
+2. **视觉效果更自然**:
+   - 保持原有的波形分布形状，只是平移并拉伸
+   - 避免过度放大噪声产生不自然的硬边
+3. **参数调节更直观**:
+   - 偏移量控制颜色分层位置
+   - 乘数控制分层对比度
 
 ------
 

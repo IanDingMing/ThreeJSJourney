@@ -911,7 +911,120 @@ waterMaterial.uniforms.uDepthColor.value = new THREE.Color(newColor);
 
 
 
-## P32 
+## P32 Animated galaxy
+
+### 1. `uSize` 优化写法解释
+
+```typescript
+uniforms: {
+  uSize: { value: 8 * renderer.getPixelRatio() },
+}
+```
+
+**为什么要乘以 `getPixelRatio()`：**
+
+- `getPixelRatio()` 返回设备的像素比（如普通显示器是1，Retina显示器是2）
+- 在高DPI屏幕上，需要更大的点大小才能看起来清晰
+- 这样写确保在所有设备上粒子大小一致
+
+
+
+### 2. 大小衰减公式详解
+
+```glsl
+gl_PointSize *= (1.0 / -viewPosition.z);
+```
+
+**解释：**
+
+- `viewPosition.z` 是顶点在视图空间中的Z坐标（深度）
+- 在视图空间中，相机看向-Z方向，所以离相机越远，Z值越负
+- `-viewPosition.z` 就是顶点到相机的距离
+- `1.0 / -viewPosition.z` 就是距离的倒数
+- **效果**：距离相机越远的粒子越小，产生透视效果
+
+
+
+### 3. `gl_PointCoord` 和内置属性
+
+**`gl_PointCoord`：**
+
+- 是片元着色器的内置变量
+- 表示当前片元在点精灵内的坐标，范围 [0.0, 1.0]
+- 只在绘制 `THREE.Points` 时有效
+
+**其他重要内置属性：**
+
+**顶点着色器：**
+
+- `position` - 顶点位置
+- `gl_Position` - 输出的裁剪空间坐标
+- `gl_PointSize` - 点大小
+
+**片元着色器：**
+
+- `gl_FragCoord` - 片元在屏幕上的坐标
+- `gl_FragColor` - 输出的颜色
+- `gl_PointCoord` - 点在点精灵内的坐标
+
+
+
+### 4. `blending: THREE.AdditiveBlending` 的作用
+
+**注释掉会有什么改变：**
+
+- **有 AdditiveBlending**：颜色叠加，重叠部分更亮，适合发光效果
+- **无 AdditiveBlending**：使用默认混合，重叠部分可能变暗或不透明
+- 对于星系效果，AdditiveBlending 能产生更好的发光星云效果
+
+
+
+### 5. 三种点形状模式解释
+
+```glsl
+// Disc - 实心圆盘
+float strength = distance(gl_PointCoord, vec2(.5));
+strength = step(.5, strength);  // 距离>0.5返回0，否则返回1
+strength = 1.0 - strength;      // 反转：中心1，边缘0
+
+// Diffuse point - 渐变圆
+float strength = distance(gl_PointCoord, vec2(.5));
+strength *= 2.0;                // 扩大渐变范围
+strength = 1.0 - strength;      // 反转：中心亮，边缘暗
+
+// Light point - 光点
+float strength = distance(gl_PointCoord, vec2(.5));
+strength = 1.0 - strength;      // 中心1，边缘0
+strength = pow(strength, 10.0); // 提高对比度，中心更亮
+```
+
+**为什么是2.0不是3.0：**
+
+- 2.0是经验值，控制渐变范围
+- 3.0会使边缘更暗，中心更小
+- 可以根据视觉效果调整
+
+**`pow(strength, 10.0)` 的作用：**
+
+- 指数函数提高对比度
+- 值越大，中心亮点越小越亮
+- 10.0使得只有非常靠近中心的区域才亮
+
+
+
+### 6. 为什么不在片元着色器中直接使用`attribute`，而是通过顶点着色器的 `varying` 传递
+
+**原因：**
+
+- `attribute` 只能在顶点着色器中使用
+- `varying` 用于从顶点着色器向片元着色器传递数据
+- 颜色需要在每个片元上进行插值
+
+
+
+
+
+## P33
 
 
 

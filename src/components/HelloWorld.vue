@@ -21,8 +21,6 @@ import { getTextureUrl } from "@/utils/texturesUtils";
 // 导入RectAreaLightHelper
 import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
 import * as CANNON from "cannon-es";
-import galaxyVertexShader from "@/shaders/galaxy/vertex.glsl?raw";
-import galaxyFragmentShader from "@/shaders/galaxy/fragment.glsl?raw";
 
 const sizes = {
   width: 800,
@@ -73,6 +71,74 @@ const handleDoubleClick = () => {
   }
 };
 
+/**
+ * 模型加载
+ */
+// 1. 初始化加载器
+const gltfLoader = new GLTFLoader();
+
+// 2. 定义模型路径（支持 gltf/glb 等格式）
+const modelPath = `${
+  import.meta.env.BASE_URL
+}models/LeePerrySmith/LeePerrySmith.glb`; // 文件路径：/public/models/Duck
+
+/**
+ * Textures加载
+ */
+const loadingManager = new THREE.LoadingManager();
+loadingManager.onStart = () => {
+  console.log("Loading started");
+};
+loadingManager.onLoad = () => {
+  console.log("Loading complete");
+};
+loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+  console.log(
+    `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
+  );
+};
+loadingManager.onError = (url) => {
+  console.log(`There was an error loading ${url}`);
+};
+
+// 加载环境贴图
+const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
+const environmentMap = cubeTextureLoader.load([
+  getTextureUrl("environmentMaps/0/px.jpg"),
+  getTextureUrl("environmentMaps/0/nx.jpg"),
+  getTextureUrl("environmentMaps/0/py.jpg"),
+  getTextureUrl("environmentMaps/0/ny.jpg"),
+  getTextureUrl("environmentMaps/0/pz.jpg"),
+  getTextureUrl("environmentMaps/0/nz.jpg"),
+]);
+environmentMap.encoding = THREE.sRGBEncoding;
+
+// 加载模型纹理
+const texturesLoader = new THREE.TextureLoader(loadingManager);
+const mapTexture = texturesLoader.load(
+  `${import.meta.env.BASE_URL}models/LeePerrySmith/color.jpg`
+);
+mapTexture.encoding = THREE.sRGBEncoding;
+const normalTexture = texturesLoader.load(
+  `${import.meta.env.BASE_URL}models/LeePerrySmith/normal.jpg`
+);
+
+/**
+ * Update all materials
+ */
+const updateAllMaterials = (scene: THREE.Scene) => {
+  scene.traverse((child) => {
+    if (
+      child instanceof THREE.Mesh &&
+      child.material instanceof THREE.MeshStandardMaterial
+    ) {
+      child.material.envMapIntensity = 5;
+      child.material.needsUpdate = true;
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+};
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
@@ -81,128 +147,54 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
+  scene.background = environmentMap;
+  scene.environment = environmentMap;
 
-  // 模型mesh==========================
+  // 模型mesh======================
+  // Material
+  const material = new THREE.MeshStandardMaterial({
+    map: mapTexture,
+    normalMap: normalTexture,
+  });
 
-  /**
-   * Galaxy
-   */
-  const parameters = {
-    count: 200000,
-    size: 0.005,
-    radius: 5,
-    branches: 3,
-    spin: 1,
-    randomness: 0.5,
-    randomnessPower: 3,
-    insideColor: "#ff6030",
-    outsideColor: "#1b3984",
-  };
+  // 3. 执行加载
+  gltfLoader.load(
+    modelPath,
+    // 加载成功回调
+    (gltf) => {
+      // Model
+      const mesh = gltf.scene.children[0];
+      mesh.rotation.y = Math.PI * 0.5;
+      mesh.material = material;
+      scene.add(mesh);
 
-  let geometry: THREE.BufferGeometry | null = null;
-  let material: THREE.ShaderMaterial | null = null;
-  let points: THREE.Points | null = null;
-
-  const generateGalaxy = () => {
-    if (!renderer) return;
-    if (points !== null) {
-      geometry && geometry.dispose();
-      material && material.dispose();
-      scene.remove(points);
+      // Update materials
+      updateAllMaterials(scene);
+    },
+    // 加载进度回调
+    (xhr) => {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
+    // 加载错误回调
+    (error) => {
+      console.error("加载失败：", error);
     }
-
-    /**
-     * Geometry
-     */
-    geometry = new THREE.BufferGeometry();
-
-    const positions = new Float32Array(parameters.count * 3);
-    const colors = new Float32Array(parameters.count * 3);
-    const scales = new Float32Array(parameters.count * 1);
-    const randomness = new Float32Array(parameters.count * 3);
-
-    const insideColor = new THREE.Color(parameters.insideColor);
-    const outsideColor = new THREE.Color(parameters.outsideColor);
-
-    for (let i = 0; i < parameters.count; i++) {
-      const i3 = i * 3;
-
-      // Position
-      const radius = Math.random() * parameters.radius;
-
-      const branchAngle =
-        ((i % parameters.branches) / parameters.branches) * Math.PI * 2;
-
-      //Randomness
-      const randomX =
-        Math.pow(Math.random(), parameters.randomnessPower) *
-        (Math.random() < 0.5 ? 1 : -1) *
-        parameters.randomness *
-        radius;
-      const randomY =
-        Math.pow(Math.random(), parameters.randomnessPower) *
-        (Math.random() < 0.5 ? 1 : -1) *
-        parameters.randomness *
-        radius;
-      const randomZ =
-        Math.pow(Math.random(), parameters.randomnessPower) *
-        (Math.random() < 0.5 ? 1 : -1) *
-        parameters.randomness *
-        radius;
-      randomness[i3] = randomX;
-      randomness[i3 + 1] = randomY;
-      randomness[i3 + 2] = randomZ;
-
-      positions[i3] = Math.cos(branchAngle) * radius;
-      positions[i3 + 1] = 0;
-      positions[i3 + 2] = Math.sin(branchAngle) * radius;
-
-      // Color
-      const mixedColor = insideColor.clone();
-      mixedColor.lerp(outsideColor, radius / parameters.radius);
-
-      colors[i3] = mixedColor.r;
-      colors[i3 + 1] = mixedColor.g;
-      colors[i3 + 2] = mixedColor.b;
-
-      // Scales
-      scales[i] = Math.random();
-    }
-
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute("aScale", new THREE.BufferAttribute(scales, 1));
-    geometry.setAttribute(
-      "aRandomness",
-      new THREE.BufferAttribute(randomness, 3)
-    );
-
-    /**
-     * Material
-     */
-    material = new THREE.ShaderMaterial({
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      vertexColors: true,
-      vertexShader: galaxyVertexShader,
-      fragmentShader: galaxyFragmentShader,
-      uniforms: {
-        uTime: { value: 0 },
-        uSize: { value: 30 * renderer.getPixelRatio() },
-      },
-    });
-
-    /**
-     * Points
-     */
-    points = new THREE.Points(geometry, material);
-    scene.add(points);
-  };
-
+  );
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
+
+  /**
+   * Lights
+   */
+  const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
+  directionalLight.castShadow = true;
+  directionalLight.shadow.mapSize.set(1024, 1024);
+  directionalLight.shadow.camera.far = 15;
+  directionalLight.shadow.normalBias = 0.05;
+  directionalLight.position.set(0.25, 2, -2.25);
+  scene.add(directionalLight);
 
   /**
    * Camera
@@ -214,9 +206,7 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.x = 3;
-  camera.position.y = 3;
-  camera.position.z = 3;
+  camera.position.set(4, 1, -4);
   scene.add(camera);
 
   // Controls
@@ -238,9 +228,6 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
-    // Update material
-    material && (material.uniforms.uTime.value = elapsedTime);
-
     // Animate meshes
     meshArray.forEach((mesh) => {});
 
@@ -252,50 +239,11 @@ onMounted(() => {
   }
   render();
 
-  /**
-   * Generate galaxy
-   * 因为这里用到renderer的属性，所以要放在render之后
-   */
-  generateGalaxy();
-
   // 添加事件监听
   window.addEventListener("resize", handleResize);
 
   // 创建GUI===================
   gui = new GUI();
-
-  gui
-    .add(parameters, "count")
-    .min(100)
-    .max(1000000)
-    .step(100)
-    .onFinishChange(generateGalaxy);
-  gui
-    .add(parameters, "radius")
-    .min(0.01)
-    .max(20)
-    .step(0.01)
-    .onFinishChange(generateGalaxy);
-  gui
-    .add(parameters, "branches")
-    .min(2)
-    .max(20)
-    .step(1)
-    .onFinishChange(generateGalaxy);
-  gui
-    .add(parameters, "randomness")
-    .min(0)
-    .max(2)
-    .step(0.001)
-    .onFinishChange(generateGalaxy);
-  gui
-    .add(parameters, "randomnessPower")
-    .min(1)
-    .max(10)
-    .step(0.001)
-    .onFinishChange(generateGalaxy);
-  gui.addColor(parameters, "insideColor").onFinishChange(generateGalaxy);
-  gui.addColor(parameters, "outsideColor").onFinishChange(generateGalaxy);
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

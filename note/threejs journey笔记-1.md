@@ -1697,11 +1697,17 @@ spinAngle:距离中心越远，偏移程度越大，也就弯的越厉害
 
 ```
       const randomX =
-        Math.pow(Math.random(), parameters.randomnessPower);
+        Math.pow(Math.random(), parameters.randomnessPower) *
+        parameters.randomness *
+        radius;
       const randomY =
-        Math.pow(Math.random(), parameters.randomnessPower);
+        Math.pow(Math.random(), parameters.randomnessPower) *
+        parameters.randomness *
+        radius;
       const randomZ =
-        Math.pow(Math.random(), parameters.randomnessPower);
+        Math.pow(Math.random(), parameters.randomnessPower) *
+        parameters.randomness *
+        radius;
 
       positions[i3 + 0] = Math.cos(branchAngle + spinAngle) * radius + randomX;
       positions[i3 + 1] = randomY;
@@ -1717,13 +1723,19 @@ spinAngle:距离中心越远，偏移程度越大，也就弯的越厉害
 ```
       const randomX =
         Math.pow(Math.random(), parameters.randomnessPower) *
-        (Math.random() < 0.5 ? 1 : -1);
+        (Math.random() < 0.5 ? 1 : -1) *
+        parameters.randomness *
+        radius;
       const randomY =
         Math.pow(Math.random(), parameters.randomnessPower) *
-        (Math.random() < 0.5 ? 1 : -1);
+        (Math.random() < 0.5 ? 1 : -1) *
+        parameters.randomness *
+        radius;
       const randomZ =
         Math.pow(Math.random(), parameters.randomnessPower) *
-        (Math.random() < 0.5 ? 1 : -1);
+        (Math.random() < 0.5 ? 1 : -1) *
+        parameters.randomness *
+        radius;
 
       positions[i3 + 0] = Math.cos(branchAngle + spinAngle) * radius + randomX;
       positions[i3 + 1] = randomY;

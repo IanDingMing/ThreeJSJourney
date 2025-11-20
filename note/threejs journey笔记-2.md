@@ -833,6 +833,8 @@ float elevation = sin(
 
 [2D噪声和3D噪声的区别是什么？](#2D噪声 vs 3D噪声)
 
+[3D柏林噪声源码](#3D柏林噪声源码)
+
 ```glsl
 for(float i = 1.0; i <= uSmallIterations; i++) {
   elevation -= abs(cnoise(vec3(modelPosition.xz * uSmallWavesFrequency * i, uTime * uSmallWavesSpeed)) * uSmallWavesElevation / i);
@@ -1024,7 +1026,219 @@ strength = pow(strength, 10.0); // 提高对比度，中心更亮
 
 
 
-## P33
+## P33 Modified materials
+
+### 1. 为什么要学习材质效果提升？
+
+在Three.js开发中，我们经常需要给内置材质添加自定义效果（如波浪、扭曲、溶解等），但直接修改Three.js源码是不可行的。本节课教你两种专业方法：
+
+- **Hook注入法**：通过`onBeforeCompile`在材质编译前注入自定义代码
+- **重建材质法**：完全重写材质（复杂但灵活）
+
+
+
+### 2. 理解着色器修改(Hook注入法)核心思路
+
+Three.js的着色器系统是**模块化**的。它不像一堆散装的代码，而是把不同的功能封装成了一个个的 **`ShaderChunk`（着色器代码块）** 。这就好比搭积木，Three.js在构建一个完整的着色器时，会按需组合这些模块。
+
+所以，你问题的核心答案是：**你不需要去猜测或记忆应该修改哪个文件，而是要通过“打印”和“分析”的方式，找到对应材质着色器的结构，然后在正确的`ShaderChunk`里注入代码。**
+
+具体来说：
+
+- **定位方法**：通过在`material.onBeforeCompile`中打印`shader.vertexShader`和`shader.fragmentShader`，你可以看到当前材质**完整**的、已经组合好的着色器代码。这其中就包含了所有被引入的`ShaderChunk`（例如`#include <begin_vertex>`）。
+- **修改逻辑**：你不是直接去`node_modules`里修改源文件，而是在`onBeforeCompile`的回调函数里，通过字符串替换（`replace`方法），在特定的`ShaderChunk`代码块前后**注入**你自己的逻辑。你提供的代码里替换`#include <common>`和`#include <begin_vertex>`等操作就是典型的例子。
+
+下表总结了查找和修改着色器的核心思路：
+
+| 步骤            | 核心方法                                                     | 目的与说明                                                   |
+| :-------------- | :----------------------------------------------------------- | :----------------------------------------------------------- |
+| **1. 探查结构** | 在`onBeforeCompile`中**打印**`shader.vertexShader`和`shader.fragmentShader` | 获取**当前材质完整的着色器代码**，看清所有`#include`模块。   |
+| **2. 选择模块** | **分析**打印出的代码，找到与目标效果相关的`ShaderChunk`      | 例如，做顶点动画，通常关注`begin_vertex`；需要新的Uniform，则需修改`common`。 |
+| **3. 注入代码** | 使用`replace`方法，在选定的`ShaderChunk`前后**插入自定义GLSL代码** | 你并非直接修改`node_modules`里的文件，而是在运行时“注入”逻辑。 |
+
+### 3. Hook注入法的常见应用案例
+
+1. **旗帜飘动** - 基于时间的正弦波变换
+2. **水面波动** - 复杂的噪声函数
+3. **布料模拟** - 物理基础的顶点动画
+4. **变形动画** - 形状过渡效果
+5. **溶解效果** - 基于噪声的透明度变化
+
+
+
+### 4. Hook注入法
+
+#### 1. Three.js着色器系统架构
+
+```text
+ShaderLib (材质库)
+    ↓
+ShaderChunk (代码模块) 
+    ↓
+Material.onBeforeCompile (编译钩子)
+    ↓
+Custom Shader Code (自定义代码)
+```
+
+#### 2. 着色器注入工作流程
+
+```javascript
+// 步骤1：准备自定义uniforms
+const customUniforms = { uTime: { value: 0 } };
+
+// 步骤2：在编译前拦截并修改
+material.onBeforeCompile = (shader) => {
+  // 注入uniforms
+  shader.uniforms.uTime = customUniforms.uTime;
+  
+  // 修改顶点着色器
+  shader.vertexShader = modifyVertexShader(shader.vertexShader);
+  
+  // 修改片段着色器（如果需要）
+  shader.fragmentShader = modifyFragmentShader(shader.fragmentShader);
+};
+
+// 步骤3：在动画循环中更新uniforms
+function animate() {
+  customUniforms.uTime.value = elapsedTime;
+}
+```
+
+### 3. transformed vs position 的区别
+
+```glsl
+node_modules/three/src/renderers/shaders/ShaderChunk/begin_vertex.glsl.js
+
+// begin_vertex.glsl.js 中的关键代码
+vec3 transformed = vec3( position );
+```
+
+**区别**：
+
+- `position`：顶点的**原始坐标**（模型空间），从不改变
+- `transformed`：**处理中的顶点坐标**，会被各种变换修改（位移、旋转、缩放等）
+
+**处理流程**：
+
+```text
+position (原始) → transformed (处理中) → gl_Position (最终)
+```
+
+
+
+### 5. 阴影Shadow与深度材质depthMaterial的关系
+
+**关键理解**：
+
+- **默认材质**：用于正常渲染，受光照影响
+- **depthMaterial**：用于生成阴影贴图，只关心深度信息
+- **Shadow只作用于默认材质**：因为阴影计算基于场景的视觉表现，而不是深度图的原始数据
+
+```javascript
+// 你的代码中正确设置了两个材质
+const material = new THREE.MeshStandardMaterial({...}); // 视觉材质
+const depthMaterial = new THREE.MeshDepthMaterial({...}); // 深度材质
+mesh.customDepthMaterial = depthMaterial; // 为阴影指定专用材质
+```
+
+**depthMaterial**深度信息确实常用于雾效，但它**最根本的作用是判断“谁在前，谁在后”**。在Three.js的阴影系统里，这个过程分为两步：
+
+1. **生成阴影贴图 (Shadow Map)**：从光源的视角渲染整个场景，但**不关心颜色**，只关心每个像素离光源的**深度**，这个结果就是阴影贴图。
+2. **应用阴影**：从相机视角正常渲染时，将每个片元的位置与阴影贴图中的深度值比较，如果它比阴影贴图记录的值离光源更远，就意味着它在阴影里。
+
+现在来看你代码中的两个材质：
+
+- `material` (MeshStandardMaterial): 这是用于**主渲染**的，负责模型的颜色、光照、质感等所有视觉表现。
+- `depthMaterial` (MeshDepthMaterial): 这是一个特殊的材质，它**只输出深度信息**。你将它赋值给`customDepthMaterial`，是**告诉Three.js在生成阴影贴图（第一步）时，请用这个材质来渲染我的模型**。
+
+**为什么需要`customDepthMaterial`？**
+当你通过着色器修改了顶点位置（比如波浪扭曲）后，用于主渲染的`material`的顶点变化了，但默认用于生成阴影贴图的材质**并不知道这个变化**。这会导致阴影还停留在模型原来的形状上，造成视觉错误。
+通过指定一个同样应用了波浪扭曲顶点变换的`depthMaterial`，就能确保**生成阴影贴图时，模型的顶点位置与主渲染中保持一致**，阴影也就正确了。
+
+`customDepthMaterial`是Three.js Mesh的一个**官方支持的属性**，正是为了解决此类问题。
+
+
+
+### 6. Hook方法是官方推荐的吗？
+
+**答案**：是的，这是官方支持的扩展方式！
+
+**为什么规范**：
+
+- `onBeforeCompile` 是Three.js**官方API**
+- 允许在不修改源码的情况下扩展功能
+- 遵循了**开闭原则**（对扩展开放，对修改关闭）
+- 广泛应用于Three.js生态中的高级效果
+
+
+
+### 7. 代码深度分析
+
+#### 波浪效果实现原理
+
+```javascript
+// 1. 定义自定义uniform
+const customUniforms = {
+  uTime: { value: 0 }
+};
+
+// 2. 在材质编译前注入代码
+material.onBeforeCompile = (shader) => {
+  shader.uniforms.uTime = customUniforms.uTime;
+  
+  // 3. 注入旋转矩阵函数
+  shader.vertexShader = shader.vertexShader.replace(
+    "#include <common>",
+    `#include <common>
+    uniform float uTime;
+    mat2 get2dRotateMatrix(float _angle) {
+      return mat2(cos(_angle), -sin(_angle), sin(_angle), cos(_angle));
+    }`
+  );
+  
+  // 4. 修改法线计算（确保光照正确）
+  shader.vertexShader = shader.vertexShader.replace(
+    "#include <beginnormal_vertex>",
+    `#include <beginnormal_vertex>
+    float angle = (sin(position.y + uTime)) * 0.4;
+    mat2 rotateMatrix = get2dRotateMatrix(angle);
+    objectNormal.xz = rotateMatrix * objectNormal.xz;`
+  );
+  
+  // 5. 修改顶点位置
+  shader.vertexShader = shader.vertexShader.replace(
+    "#include <begin_vertex>",
+    `#include <begin_vertex>
+    transformed.xz = rotateMatrix * transformed.xz;`
+  );
+};
+```
+
+
+
+### 8. 💡 为何通过材质修改模型形状
+
+这确实是理解上的一个关键点。在3D图形编程中（尤其是在Three.js这类基于WebGL的引擎里），**模型的“形状”是由顶点着色器最终决定的**。
+
+- **几何体 (Geometry)**：提供顶点的**初始数据**（位置、法线、UV等）。
+- **顶点着色器 (Vertex Shader)**：负责在GPU上对每个顶点进行**最终的位置变换**。它可以移动顶点。
+- **材质 (Material)**：它**包含着色器**（顶点着色器和片元着色器）以及控制着色器行为的**参数**（如Uniforms）。
+
+所以，你的操作 `material.onBeforeCompile`，本质上是**修改了该材质所绑定的顶点着色器**。你在着色器里移动了顶点，自然就改变了模型的形状。这并非“花活”，而是**非常标准且强大的GPU驱动顶点动画的实现方式**。
+
+
+
+## P34
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1521,6 +1735,95 @@ float strength = angle;
 
 - 2D噪声就像在纸上画画，只有表面
 - 3D噪声就像雕刻石头，有厚度和内部结构
+
+
+
+------
+
+## 3D柏林噪声源码
+
+```
+// Classic Perlin 3D Noise 
+// by Stefan Gustavson
+//
+vec4 permute(vec4 x) {
+  return mod(((x * 34.0) + 1.0) * x, 289.0);
+}
+vec4 taylorInvSqrt(vec4 r) {
+  return 1.79284291400159 - 0.85373472095314 * r;
+}
+vec3 fade(vec3 t) {
+  return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+float cnoise(vec3 P) {
+  vec3 Pi0 = floor(P); // Integer part for indexing
+  vec3 Pi1 = Pi0 + vec3(1.0); // Integer part + 1
+  Pi0 = mod(Pi0, 289.0);
+  Pi1 = mod(Pi1, 289.0);
+  vec3 Pf0 = fract(P); // Fractional part for interpolation
+  vec3 Pf1 = Pf0 - vec3(1.0); // Fractional part - 1.0
+  vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
+  vec4 iy = vec4(Pi0.yy, Pi1.yy);
+  vec4 iz0 = Pi0.zzzz;
+  vec4 iz1 = Pi1.zzzz;
+
+  vec4 ixy = permute(permute(ix) + iy);
+  vec4 ixy0 = permute(ixy + iz0);
+  vec4 ixy1 = permute(ixy + iz1);
+
+  vec4 gx0 = ixy0 / 7.0;
+  vec4 gy0 = fract(floor(gx0) / 7.0) - 0.5;
+  gx0 = fract(gx0);
+  vec4 gz0 = vec4(0.5) - abs(gx0) - abs(gy0);
+  vec4 sz0 = step(gz0, vec4(0.0));
+  gx0 -= sz0 * (step(0.0, gx0) - 0.5);
+  gy0 -= sz0 * (step(0.0, gy0) - 0.5);
+
+  vec4 gx1 = ixy1 / 7.0;
+  vec4 gy1 = fract(floor(gx1) / 7.0) - 0.5;
+  gx1 = fract(gx1);
+  vec4 gz1 = vec4(0.5) - abs(gx1) - abs(gy1);
+  vec4 sz1 = step(gz1, vec4(0.0));
+  gx1 -= sz1 * (step(0.0, gx1) - 0.5);
+  gy1 -= sz1 * (step(0.0, gy1) - 0.5);
+
+  vec3 g000 = vec3(gx0.x, gy0.x, gz0.x);
+  vec3 g100 = vec3(gx0.y, gy0.y, gz0.y);
+  vec3 g010 = vec3(gx0.z, gy0.z, gz0.z);
+  vec3 g110 = vec3(gx0.w, gy0.w, gz0.w);
+  vec3 g001 = vec3(gx1.x, gy1.x, gz1.x);
+  vec3 g101 = vec3(gx1.y, gy1.y, gz1.y);
+  vec3 g011 = vec3(gx1.z, gy1.z, gz1.z);
+  vec3 g111 = vec3(gx1.w, gy1.w, gz1.w);
+
+  vec4 norm0 = taylorInvSqrt(vec4(dot(g000, g000), dot(g010, g010), dot(g100, g100), dot(g110, g110)));
+  g000 *= norm0.x;
+  g010 *= norm0.y;
+  g100 *= norm0.z;
+  g110 *= norm0.w;
+  vec4 norm1 = taylorInvSqrt(vec4(dot(g001, g001), dot(g011, g011), dot(g101, g101), dot(g111, g111)));
+  g001 *= norm1.x;
+  g011 *= norm1.y;
+  g101 *= norm1.z;
+  g111 *= norm1.w;
+
+  float n000 = dot(g000, Pf0);
+  float n100 = dot(g100, vec3(Pf1.x, Pf0.yz));
+  float n010 = dot(g010, vec3(Pf0.x, Pf1.y, Pf0.z));
+  float n110 = dot(g110, vec3(Pf1.xy, Pf0.z));
+  float n001 = dot(g001, vec3(Pf0.xy, Pf1.z));
+  float n101 = dot(g101, vec3(Pf1.x, Pf0.y, Pf1.z));
+  float n011 = dot(g011, vec3(Pf0.x, Pf1.yz));
+  float n111 = dot(g111, Pf1);
+
+  vec3 fade_xyz = fade(Pf0);
+  vec4 n_z = mix(vec4(n000, n100, n010, n110), vec4(n001, n101, n011, n111), fade_xyz.z);
+  vec2 n_yz = mix(n_z.xy, n_z.zw, fade_xyz.y);
+  float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x);
+  return 2.2 * n_xyz;
+}
+```
 
 ------
 

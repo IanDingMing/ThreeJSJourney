@@ -1228,7 +1228,129 @@ material.onBeforeCompile = (shader) => {
 
 
 
-## P34
+## P34 Coffee Smoke Shader
+
+### 核心概念理解
+
+#### 噪声纹理 = 二维随机数场
+
+```glsl
+float twistPerlin = texture(uPerlinTexture, vec2(.5, uv.y * .2 - uTime * .005)).r;
+```
+
+**重要认知**：噪声纹理实际上是一个预计算的二维随机数场，每个纹理坐标对应一个固定的随机值(0-1范围)，通过UV坐标变化获取不同的"随机"数值。
+
+
+
+### 资源与工具
+
+#### 噪声纹理制作网站
+
+- [Perlin Noise Maker](http://kitfox.com/projects/perlinNoiseMaker/)
+- [Noise Textures](https://opengameart.org/content/700-noise-textures)
+- [EffectTextureMaker](https://mebiusbox.github.io/contents/EffectTextureMaker/)
+
+#### 噪声纹理选择规则
+
+- **变化丰富度**：纹理需要足够的细节变化保证真实感
+- **分辨率**：至少128×128像素，避免像素化
+- **无缝重复**：就是复制一个纹理，放在上下左右都可以完美缝合，这样不会出现纹理突变，使用`THREE.RepeatWrapping`确保纹理边界平滑
+
+
+
+### 1. 片元着色器特殊语句
+
+```glsl
+#include <tonemapping_fragment>
+#include <colorspace_fragment>
+```
+
+- `tonemapping_fragment`：色调映射，将HDR颜色转换为显示范围
+- `colorspace_fragment`：颜色空间转换，确保颜色显示一致
+- 这两句是Three.js内置的着色器模块，不是标准GLSL语法
+
+### 2. Uniforms的正确写法
+
+```javascript
+// 推荐写法 - 对象字面量
+uniforms: {
+    uTime: { value: 0 },
+    uPerlinTexture: { value: perlinTexture }
+}
+
+// 等价写法 - Uniform构造函数
+uniforms: {
+    uTime: new THREE.Uniform(0),
+    uPerlinTexture: new THREE.Uniform(perlinTexture)
+}
+```
+
+**两种写法功能完全等效**，但对象字面量更简洁，是社区标准写法。
+
+### 3. GLSL赋值特性
+
+```glsl
+vec2 smokeUv = vUv;  // 这是深拷贝
+```
+
+在GLSL中，基本类型和向量都是值传递，修改`smokeUv`不会影响原始的`vUv`。
+
+### 4. smoothstep的具体用法和应用场景
+
+**回答**：
+
+- **语法**：`smoothstep(edge0, edge1, x)`
+
+- **作用**：当x < edge0时返回0，x > edge1时返回1，在edge0和edge1之间平滑过渡
+
+- **应用场景**：
+
+  ```glsl
+  // 1. 阈值处理：将噪声转换为清晰的形状
+  smoke = smoothstep(0.4, 1.0, smoke);
+  
+  // 2. 边缘淡入淡出：创建自然边界
+  smoke *= smoothstep(0.0, 0.1, vUv.x);  // 左边缘淡入
+  smoke *= smoothstep(1.0, 0.9, vUv.x);  // 右边缘淡出
+  ```
+
+  
+
+### 5. 临时覆盖变量法
+
+```glsl
+// Edges
+// smoke = 1.0;  // 调试时取消注释，查看完整形状
+smoke *= smoothstep(0.0, .1, vUv.x);
+```
+
+**调试价值**：
+
+- 快速隔离问题：将复杂效果替换为简单值
+- 可视化形状：看到完整的几何体形状
+- 逐步调试：逐行测试每个效果
+
+
+
+### 6. 透明材质深度写入问题
+
+```javascript
+const smokeMaterial = new THREE.ShaderMaterial({
+    transparent: true,     // 启用透明度
+    depthWrite: false,     // 避免透明物体深度冲突
+    side: THREE.DoubleSide // 双面渲染
+});
+```
+
+**为什么需要`depthWrite: false`**：
+
+- 透明物体的渲染顺序会影响最终效果
+- 如果开启深度写入，透明部分可能会错误地遮挡不透明物体
+- 关闭深度写入可以避免透明物体之间的深度冲突
+
+
+
+## P35
 
 
 

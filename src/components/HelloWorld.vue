@@ -80,7 +80,7 @@ const gltfLoader = new GLTFLoader();
 // 2. 定义模型路径（支持 gltf/glb 等格式）
 const modelPath = `${
   import.meta.env.BASE_URL
-}models/LeePerrySmith/LeePerrySmith.glb`; // 文件路径：/public/models/Duck
+}models/coffee-smoke-shader/bakedModel.glb`; // 文件路径：/public/models/Duck
 
 /**
  * Textures加载
@@ -101,44 +101,12 @@ loadingManager.onError = (url) => {
   console.log(`There was an error loading ${url}`);
 };
 
-// 加载环境贴图
-const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
-const environmentMap = cubeTextureLoader.load([
-  getTextureUrl("environmentMaps/0/px.jpg"),
-  getTextureUrl("environmentMaps/0/nx.jpg"),
-  getTextureUrl("environmentMaps/0/py.jpg"),
-  getTextureUrl("environmentMaps/0/ny.jpg"),
-  getTextureUrl("environmentMaps/0/pz.jpg"),
-  getTextureUrl("environmentMaps/0/nz.jpg"),
-]);
-environmentMap.encoding = THREE.sRGBEncoding;
-
 // 加载模型纹理
 const texturesLoader = new THREE.TextureLoader(loadingManager);
 const mapTexture = texturesLoader.load(
   `${import.meta.env.BASE_URL}models/LeePerrySmith/color.jpg`
 );
-mapTexture.encoding = THREE.sRGBEncoding;
-const normalTexture = texturesLoader.load(
-  `${import.meta.env.BASE_URL}models/LeePerrySmith/normal.jpg`
-);
 
-/**
- * Update all materials
- */
-const updateAllMaterials = (scene: THREE.Scene) => {
-  scene.traverse((child) => {
-    if (
-      child instanceof THREE.Mesh &&
-      child.material instanceof THREE.MeshStandardMaterial
-    ) {
-      child.material.envMapIntensity = 5;
-      child.material.needsUpdate = true;
-      child.castShadow = true;
-      child.receiveShadow = true;
-    }
-  });
-};
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
@@ -147,86 +115,8 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
-  scene.background = environmentMap;
-  scene.environment = environmentMap;
 
   // 模型mesh======================
-  // Material
-  const material = new THREE.MeshStandardMaterial({
-    map: mapTexture,
-    normalMap: normalTexture,
-  });
-  const depthMaterial = new THREE.MeshDepthMaterial({
-    depthPacking: THREE.RGBADepthPacking,
-  });
-
-  const customUniforms = {
-    uTime: { value: 0 },
-  };
-  // 材质在被编译之前运行的代码
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = customUniforms.uTime;
-
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <common>",
-      `
-        #include <common>
-        
-          uniform float uTime;
-          mat2 get2dRotateMatrix(float _angle)
-          {
-              return mat2(cos(_angle), - sin(_angle), sin(_angle), cos(_angle));
-          }
-      `
-    );
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <beginnormal_vertex>",
-      `
-        #include <beginnormal_vertex>
-          // float angle = (position.y + uTime) * .9;
-          float angle = (sin(position.y + uTime)) * 0.4;
-          mat2 rotateMatrix = get2dRotateMatrix(angle);
-          
-          objectNormal.xz = rotateMatrix * objectNormal.xz;
-      `
-    );
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <begin_vertex>",
-      `
-        #include <begin_vertex>
-          
-          transformed.xz = rotateMatrix * transformed.xz;
-      `
-    );
-  };
-
-  depthMaterial.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = customUniforms.uTime;
-
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <common>",
-      `
-        #include <common>
-        
-          uniform float uTime;
-          mat2 get2dRotateMatrix(float _angle)
-          {
-              return mat2(cos(_angle), - sin(_angle), sin(_angle), cos(_angle));
-          }
-      `
-    );
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <begin_vertex>",
-      `
-        #include <begin_vertex>
-          // float angle = (position.y + uTime) * .9;
-          float angle = (sin(position.y + uTime)) * 0.4;
-          mat2 rotateMatrix = get2dRotateMatrix(angle);
-          
-          transformed.xz = rotateMatrix * transformed.xz;
-      `
-    );
-  };
 
   // 3. 执行加载
   gltfLoader.load(
@@ -234,14 +124,8 @@ onMounted(() => {
     // 加载成功回调
     (gltf) => {
       // Model
-      const mesh = gltf.scene.children[0];
-      mesh.rotation.y = Math.PI * 0.5;
-      mesh.material = material;
-      mesh.customDepthMaterial = depthMaterial;
-      scene.add(mesh);
-
-      // Update materials
-      updateAllMaterials(scene);
+      gltf.scene.getObjectByName("baked").material.map.anisotropy = 8;
+      scene.add(gltf.scene);
     },
     // 加载进度回调
     (xhr) => {
@@ -258,49 +142,23 @@ onMounted(() => {
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
 
   /**
-   * Plane
-   */
-  const plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(15, 15, 15),
-    new THREE.MeshStandardMaterial()
-  );
-  plane.rotation.y = Math.PI;
-  plane.position.y = -5;
-  plane.position.z = 5;
-  scene.add(plane);
-
-  /**
-   * Lights
-   */
-  const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
-  directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.set(1024, 1024);
-  directionalLight.shadow.camera.far = 15;
-  directionalLight.shadow.normalBias = 0.05;
-  directionalLight.position.set(0.25, 2, -2.25);
-  scene.add(directionalLight);
-
-  const directionalLightHelper = new THREE.DirectionalLightHelper(
-    directionalLight,
-    3
-  );
-  directionalLightHelper.visible = true; // 可见性控制
-  scene.add(directionalLightHelper);
-  /**
    * Camera
    */
   // Base camera
   const camera = new THREE.PerspectiveCamera(
-    75,
+    25,
     sizes.width / sizes.height,
     0.1,
     100
   );
-  camera.position.set(4, 1, -4);
+  camera.position.x = 8;
+  camera.position.y = 10;
+  camera.position.z = 12;
   scene.add(camera);
 
   // Controls
   controls = new OrbitControls(camera, webgl.value);
+  controls.target.y = 3;
   controls.enableDamping = true;
 
   // 创建渲染器对象
@@ -308,14 +166,6 @@ onMounted(() => {
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   // renderer.setClearColor(new THREE.Color("#262837")); //设置渲染器的背景颜色
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
-  renderer.physicallyCorrectLights = true;
-  renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1;
-  renderer.setSize(sizes.width, sizes.height);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
   webgl.value!.appendChild(renderer.domElement);
 
@@ -325,8 +175,6 @@ onMounted(() => {
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
-
-    customUniforms.uTime.value = elapsedTime;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});

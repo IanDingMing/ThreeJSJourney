@@ -80,9 +80,7 @@ const handleDoubleClick = () => {
 const gltfLoader = new GLTFLoader();
 
 // 2. 定义模型路径（支持 gltf/glb 等格式）
-const modelPath = `${
-  import.meta.env.BASE_URL
-}models/coffee-smoke-shader/bakedModel.glb`; // 文件路径：/public/models/Duck
+const modelPath = `${import.meta.env.BASE_URL}models/suzanne.glb`; // 文件路径：/public/models/Duck
 
 /**
  * Textures加载
@@ -103,14 +101,6 @@ loadingManager.onError = (url) => {
   console.log(`There was an error loading ${url}`);
 };
 
-// 加载模型纹理
-const texturesLoader = new THREE.TextureLoader(loadingManager);
-const perlinTexture = texturesLoader.load(
-  `${import.meta.env.BASE_URL}models/coffee-smoke-shader/perlin.png`
-);
-perlinTexture.wrapS = THREE.RepeatWrapping; //U方向
-perlinTexture.wrapT = THREE.RepeatWrapping; //V方向
-
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
@@ -121,15 +111,39 @@ onMounted(() => {
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 模型mesh======================
+  /**
+   * Material
+   */
+  const material = new THREE.MeshBasicMaterial();
 
+  /**
+   * Objects
+   */
+  // Torus knot
+  const torusKnot = new THREE.Mesh(
+    new THREE.TorusKnotGeometry(0.6, 0.25, 128, 32),
+    material
+  );
+  torusKnot.position.x = 3;
+  scene.add(torusKnot);
+
+  // Sphere
+  const sphere = new THREE.Mesh(new THREE.SphereGeometry(), material);
+  sphere.position.x = -3;
+  scene.add(sphere);
+
+  // Suzanne
+  let suzanne: THREE.Group | null = null;
   // 3. 执行加载
   gltfLoader.load(
     modelPath,
     // 加载成功回调
     (gltf) => {
-      // Model
-      gltf.scene.getObjectByName("baked").material.map.anisotropy = 8;
-      scene.add(gltf.scene);
+      suzanne = gltf.scene;
+      suzanne.traverse((child) => {
+        if (child.isMesh) child.material = material;
+      });
+      scene.add(suzanne);
     },
     // 加载进度回调
     (xhr) => {
@@ -140,33 +154,6 @@ onMounted(() => {
       console.error("加载失败：", error);
     }
   );
-
-  /**
-   * Smoke
-   */
-  // Geometry
-  const smokeGeometry = new THREE.PlaneGeometry(1, 1, 16, 64);
-  smokeGeometry.translate(0, 0.5, 0);
-  smokeGeometry.scale(1.5, 6, 1.5);
-
-  // Material
-  const smokeMaterial = new THREE.ShaderMaterial({
-    vertexShader: coffeeSmokeVertexShader,
-    fragmentShader: coffeeSmokefragmentShader,
-    side: THREE.DoubleSide,
-    transparent: true,
-    depthWrite: false,
-    uniforms: {
-      uTime: new THREE.Uniform(0),
-      uPerlinTexture: new THREE.Uniform(perlinTexture),
-      // uPerlinTexture: { value: perlinTexture },
-    },
-    // wireframe: true,
-  });
-  // Mesh
-  const smoke = new THREE.Mesh(smokeGeometry, smokeMaterial);
-  smoke.position.y = 1.83;
-  scene.add(smoke);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -182,21 +169,19 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.x = 8;
-  camera.position.y = 10;
-  camera.position.z = 12;
+  camera.position.set(7, 7, 7);
   scene.add(camera);
 
   // Controls
   controls = new OrbitControls(camera, webgl.value);
-  controls.target.y = 3;
   controls.enableDamping = true;
 
   // 创建渲染器对象
+  const rendererParameters = { clearColor: "#1d1f2a" };
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  // renderer.setClearColor(new THREE.Color("#262837")); //设置渲染器的背景颜色
+  renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
 
   webgl.value!.appendChild(renderer.domElement);
 
@@ -207,7 +192,17 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
-    smokeMaterial.uniforms.uTime.value = elapsedTime;
+    // Rotate objects
+    if (suzanne) {
+      suzanne.rotation.x = -elapsedTime * 0.1;
+      suzanne.rotation.y = elapsedTime * 0.2;
+    }
+
+    sphere.rotation.x = -elapsedTime * 0.1;
+    sphere.rotation.y = elapsedTime * 0.2;
+
+    torusKnot.rotation.x = -elapsedTime * 0.1;
+    torusKnot.rotation.y = elapsedTime * 0.2;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -225,6 +220,10 @@ onMounted(() => {
 
   // 创建GUI===================
   gui = new GUI();
+
+  gui.addColor(rendererParameters, "clearColor").onChange(() => {
+    renderer && renderer.setClearColor(rendererParameters.clearColor);
+  });
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

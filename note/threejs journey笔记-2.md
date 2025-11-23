@@ -1350,11 +1350,156 @@ const smokeMaterial = new THREE.ShaderMaterial({
 
 
 
-## P35
+## P35 Hologram Shader
+
+### 1. 菲涅耳效应详解
+
+#### 基本概念
+
+菲涅耳效应描述了光线在不同角度观察物体表面时的反射率变化：
+
+- **垂直观察**：反射较弱，透射较强
+- **掠射角度**：反射强烈，透射较弱
+
+#### 在着色器中的实现
+
+```glsl
+// Fresnel 计算
+vec3 viewDirection = normalize(vPosition - cameraPosition);
+float fresnel = dot(viewDirection, vNormal);
+fresnel = pow(fresnel, 2.0);
+```
+
+#### 使用场景
+
+1. **边缘发光效果** - 物体边缘产生光晕
+2. **水材质** - 模拟水面反射随角度变化
+3. **玻璃材质** - 实现真实的折射反射变化
+4. **全息效果** - 当前场景的主要应用
 
 
 
+### 2. 法向量变换中的 0.0 与 1.0 区别
 
+```glsl
+// 法向量变换 - 使用 0.0
+vec4 modelNormal = modelMatrix * vec4(normal, 0.0);
+
+// 位置变换 - 使用 1.0  
+vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+```
+
+**区别说明：**
+
+- **0.0**：表示方向向量，不受平移变换影响
+- **1.0**：表示位置坐标，受完整变换矩阵影响
+
+**数学原理：**
+
+```text
+变换矩阵 M = [旋转/缩放 | 平移]
+            [  0 0 0   |  1  ]
+
+vec4(normal, 0.0) × M = 只受旋转/缩放影响
+vec4(position, 1.0) × M = 受完整变换影响
+```
+
+
+
+### 3. normalize() 使用场景详解
+
+#### 基本概念
+
+`normalize()` 将向量转换为**单位向量**（长度为1），保持方向不变。
+
+```glsl
+vec3 unitVector = normalize(originalVector);
+```
+
+#### 主要使用场景
+
+##### 3.1 光照计算（最常用）
+
+```glsl
+// 光照方向
+vec3 lightDir = normalize(lightPosition - fragmentPosition);
+
+// 视线方向  
+vec3 viewDir = normalize(cameraPosition - fragmentPosition);
+
+// 法向量标准化
+vec3 normal = normalize(vNormal);
+
+// 点积计算光照
+float diffuse = max(dot(normal, lightDir), 0.0);
+```
+
+##### 3.2 菲涅耳效应计算
+
+```glsl
+vec3 viewDirection = normalize(vPosition - cameraPosition);
+float fresnel = dot(viewDirection, normal);
+```
+
+##### 3.3 反射/折射计算
+
+```
+vec3 reflectDir = normalize(reflect(incidentDir, normal));
+vec3 refractDir = normalize(refract(incidentDir, normal, refractiveIndex));
+```
+
+
+
+#### 为什么需要 normalize？
+
+##### 点积计算的准确性
+
+```glsl
+// 错误示例：向量长度影响结果
+vec3 A = vec3(2.0, 0.0, 0.0);  // 长度=2
+vec3 B = vec3(1.0, 0.0, 0.0);  // 长度=1  
+float wrongDot = dot(A, B);     // 结果=2，不是纯角度关系
+
+// 正确示例：单位向量确保准确
+vec3 A_norm = normalize(A);     // 变成(1.0, 0.0, 0.0)
+vec3 B_norm = normalize(B);     // 变成(1.0, 0.0, 0.0)
+float correctDot = dot(A_norm, B_norm); // 结果=1，准确反映同方向
+```
+
+#### normalize 使用指南
+
+##### 需要 normalize 的情况：
+
+✅ **所有方向向量**（光照、视线、反射方向）
+✅ **插值后的法向量**（顶点→片段插值会改变长度）
+✅ **任意需要纯方向信息的场合**
+
+##### 不需要 normalize 的情况：
+
+❌ **位置坐标**（本身就是绝对位置）
+❌ **颜色值**（RGB已经是0-1范围）
+❌ **纯标量计算**（不涉及角度关系）
+❌ **长度本身就有意义的情况**（如距离计算）
+
+##### 性能优化：
+
+```glsl
+// 方案1：顶点着色器提前计算
+varying vec3 vNormal;
+
+void main() {
+    vNormal = normalize(modelNormal.xyz); // 提前normalize
+}
+
+// 方案2：片段着色器按需计算
+void main() {
+    vec3 normal = normalize(vNormal); // 确保插值后准确性
+}
+```
+
+
+
+## P36
 
 
 

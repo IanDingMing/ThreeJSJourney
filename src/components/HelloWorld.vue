@@ -112,60 +112,13 @@ onMounted(() => {
 
   // 模型mesh======================
   /**
-   * Material
+   * Test
    */
-  const materialParameters = { color: "#70c1ff" };
-  const material = new THREE.ShaderMaterial({
-    vertexShader: holographicVertexShader,
-    fragmentShader: holographicfragmentShader,
-    transparent: true,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    uniforms: {
-      uTime: new THREE.Uniform(0),
-      uColor: new THREE.Uniform(new THREE.Color(materialParameters.color)),
-    },
-  });
-
-  /**
-   * Objects
-   */
-  // Torus knot
-  const torusKnot = new THREE.Mesh(
-    new THREE.TorusKnotGeometry(0.6, 0.25, 128, 32),
-    material
+  const test = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial()
   );
-  torusKnot.position.x = 3;
-  scene.add(torusKnot);
-
-  // Sphere
-  const sphere = new THREE.Mesh(new THREE.SphereGeometry(), material);
-  sphere.position.x = -3;
-  scene.add(sphere);
-
-  // Suzanne
-  let suzanne: THREE.Group | null = null;
-  // 3. 执行加载
-  gltfLoader.load(
-    modelPath,
-    // 加载成功回调
-    (gltf) => {
-      suzanne = gltf.scene;
-      suzanne.traverse((child) => {
-        if (child.isMesh) child.material = material;
-      });
-      scene.add(suzanne);
-    },
-    // 加载进度回调
-    (xhr) => {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    // 加载错误回调
-    (error) => {
-      console.error("加载失败：", error);
-    }
-  );
+  scene.add(test);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -181,7 +134,7 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(7, 7, 7);
+  camera.position.set(1.5, 0, 6);
   scene.add(camera);
 
   // Controls
@@ -193,7 +146,6 @@ onMounted(() => {
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
 
   webgl.value!.appendChild(renderer.domElement);
 
@@ -203,21 +155,6 @@ onMounted(() => {
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
-
-    // Update material
-    material.uniforms.uTime.value = elapsedTime;
-
-    // Rotate objects
-    // if (suzanne) {
-    //   suzanne.rotation.x = -elapsedTime * 0.1;
-    //   suzanne.rotation.y = elapsedTime * 0.2;
-    // }
-
-    // sphere.rotation.x = -elapsedTime * 0.1;
-    // sphere.rotation.y = elapsedTime * 0.2;
-
-    // torusKnot.rotation.x = -elapsedTime * 0.1;
-    // torusKnot.rotation.y = elapsedTime * 0.2;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -235,13 +172,6 @@ onMounted(() => {
 
   // 创建GUI===================
   gui = new GUI();
-
-  gui.addColor(rendererParameters, "clearColor").onChange(() => {
-    renderer && renderer.setClearColor(rendererParameters.clearColor);
-  });
-  gui.addColor(materialParameters, "color").onChange(() => {
-    material.uniforms.uColor.value.set(materialParameters.color);
-  });
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

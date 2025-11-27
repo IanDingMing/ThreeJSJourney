@@ -1499,13 +1499,532 @@ void main() {
 
 
 
-## P36
+## P36 Fireworks Shaders
+
+### 1. 点精灵（Point Sprites）系统
+
+#### 1.1 为什么使用 gl_PointCoord 而不是 uv 坐标？
+
+在点精灵中，我们使用内置的`gl_PointCoord`来获取纹理坐标，而不是传统的uv坐标。
+
+**着色器中的区别：**
+
+```glsl
+// ❌ 错误：点精灵没有传统uv坐标
+vec4 color = texture2D(uTexture, vUv);
+
+// ✅ 正确：使用点精灵专用坐标
+vec4 color = texture(uTexture, gl_PointCoord);
+```
+
+**原因：**
+
+- `gl_PointCoord`：点精灵内置，范围[0,1]，表示当前片元在点精灵内的相对位置
+- `vUv`：需要手动计算传递，适用于普通网格
+
+
+
+#### 1.2 点精灵是什么？
+
+**点精灵**是图形学中的一种特殊渲染技术：
+
+```javascript
+// Three.js 中的点精灵就是 Points 对象
+const points = new THREE.Points(geometry, material);
+```
+
+**特点：**
+
+- 每个"点"实际上是一个始终面向相机的四边形
+- 不需要复杂的几何体，性能高效
+- 内置纹理坐标系统（gl_PointCoord）
+- 常用于粒子系统、星空、雨雪效果
+
+**示例：**
+
+```javascript
+// 创建点精灵粒子系统
+const geometry = new THREE.BufferGeometry();
+const positions = new Float32Array(particleCount * 3);
+// ... 设置位置数据
+geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+const material = new THREE.PointsMaterial({
+  size: 10,
+  map: texture,  // 每个点都会显示这个纹理
+  transparent: true
+});
+
+const particles = new THREE.Points(geometry, material);
+```
+
+
+
+### 2. 纹理采样函数区别
+
+### texture2D vs texture
+
+```glsl
+// WebGL 1.0 ( ES 1.0)
+texture2D(sampler2D, coord)
+textureCube(samplerCube, coord)
+
+// WebGL 2.0 ( ES 3.0) - 统一语法
+texture(sampler2D, coord)
+texture(samplerCube, coord)
+texture(sampler3D, coord)
+```
+
+**现代开发建议使用统一的`texture`函数。**
+
+
+
+### 3. Spherical 和 Sphere 的区别
+
+#### 3.1 Spherical（球面坐标系统）
+
+```javascript
+// 球面坐标用三个参数描述三维空间中的点：
+const spherical = new THREE.Spherical(
+  radius,    // 半径 - 距离原点的距离
+  phi,       // 极角 - 从Y轴正方向开始的角度（0 到 π）
+  theta      // 方位角 - 在XZ平面上的角度（0 到 2π）
+);
+```
+
+**为什么 phi 的范围是 0 到 π？**
+
+- `phi = 0`：在Y轴正方向（北极）
+- `phi = π/2`：在赤道平面
+- `phi = π`：在Y轴负方向（南极）
+
+这覆盖了整个球面的上下方向。
+
+
+
+#### 3.2 Sphere（球体对象）
+
+```javascript
+// 这是一个实际的3D几何体
+const sphere = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+```
+
+**总结区别：**
+
+- **Spherical**：坐标系统，用于在球面上定位点
+- **Sphere**：3D几何体，用于创建可视的球体模型
+
+
+
+### 4. 动画系统：GSAP + Three.js + 着色器
+
+#### 4.1 GSAP 工作原理
+
+```javascript
+gsap.to(target, {
+  value: 1,        // 目标值
+  duration: 3,     // 持续时间
+  ease: "linear",  // 缓动函数
+  onUpdate: function() {
+    // 每帧回调 - 这里可以更新uniform
+    console.log(target.value); // 这个值在3秒内从当前值线性变化到1
+  }
+});
+```
+
+
+
+#### 4.2 完整的动画流程
+
+```javascript
+// 1. GSAP 更新  层面的 uniform 值
+gsap.to(material.uniforms.uProgress, {
+    value: 1,
+    duration: 3,
+    ease: "linear"
+});
+
+// 2. Three.js 的渲染循环检测到 uniform 变化
+function animate() {
+    requestAnimationFrame(animate);
+    
+    // Three.js 自动：
+    // - 检测 material.uniforms 的变化
+    // - 将更新的 uniform 值发送到 GPU
+    // - 触发重新渲染
+    renderer.render(scene, camera);
+}
+
+// 3. 在着色器中，使用更新的 uniform 计算新位置
+// 顶点着色器：
+void main() {
+    float progress = uProgress; // 这个值每帧都在变化
+    vec3 newPosition = position * progress;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+}
+```
+
+
+
+#### 4.3 各组件的作用
+
+**GSAP 的作用：**
+
+```javascript
+// GSAP 只做这一件事：
+material.uniforms.uProgress.value = 当前动画值; // 随时间从0变到1
+```
+
+**Three.js 的作用：**
+
+```javascript
+// 在 render() 调用时，Three.js 自动：
+if (material.uniformsNeedUpdate) {
+    // 将  中的 uniform 值发送到 GPU
+    gl.uniform1f(uProgressLocation, material.uniforms.uProgress.value);
+}
+```
+
+**着色器的作用：**
+
+```glsl
+// GPU 每帧执行着色器，使用最新的 uniform 值
+// 这就是动画发生的根本原因！
+```
+
+#### 为什么说"Three.js 没有应用这种更新"？
+
+**Three.js 负责传递更新，但动画逻辑在着色器中**
+
+```javascript
+// ❌ 错误理解：Three.js 直接移动顶点
+// ✅ 正确理解：Three.js 传递数值，着色器计算移动
+```
+
+
+
+### 5. remap 函数详解
+
+#### 5.1 remap 函数定义
+
+```glsl
+float remap(float value, float originMin, float originMax, float destinationMin, float destinationMax) {
+    return destinationMin + (value - originMin) * (destinationMax - destinationMin) / (originMax - originMin);
+}
+```
+
+
+
+#### 5.2 remap 的核心功能：值域转换
+
+```glsl
+// 示例1：将 [0,1] 映射到 [0,100]
+float result = remap(uProgress, 0.0, 1.0, 0.0, 100.0);
+
+// 示例2：将 [0.5,1] 映射到 [0,1] - 延迟启动效果
+float delayedProgress = remap(uProgress, 0.5, 1.0, 0.0, 1.0);
+
+// 示例3：反向映射 [0,1] 到 [1,0]
+float reverseProgress = remap(uProgress, 0.0, 1.0, 1.0, 0.0);
+```
+
+
+
+#### 5.3 在烟花代码中的具体作用
+
+```glsl
+// 将 uProgress 的 [0,0.1] 范围映射到 [0,1] 范围
+float explodingProgress = remap(uProgress, .0, .1, .0, 1.0);
+```
+
+这意味着：
+
+- 当动画进行到 10% 时，爆炸效果就已经完成了 100%
+- 这是一种"快速启动"的效果，不是均匀的渐变
+
+**要获得真正的渐变效果，可以：**
+
+```glsl
+// 方法1：直接使用原始进度
+float explodingProgress = uProgress;
+
+// 方法2：使用完整的重映射范围
+float explodingProgress = remap(uProgress, 0.0, 1.0, 0.0, 1.0);
+
+// 方法3：使用缓动函数获得更自然的效果
+float explodingProgress = sin(uProgress * 3.14159 * 0.5); // 缓入效果
+```
+
+
+
+### 6. 烟花效果阶段分解
+
+#### 6.1 时间分段控制
+
+```glsl
+// 爆炸阶段：只在 progress 的 [0, 0.1] 范围内生效
+float explodingProgress = remap(progress, .0, .1, .0, 1.0);
+explodingProgress = clamp(explodingProgress, .0, 1.0);
+
+// 下落阶段：只在 progress 的 [0.1, 1.0] 范围内生效  
+float fallingProgress = remap(progress, .1, 1.0, .0, 1.0);
+fallingProgress = clamp(fallingProgress, .0, 1.0);
+```
+
+
+
+#### 6.2 为什么不会叠加？
+
+**因为每个阶段只在特定的时间区间内有效：**
+
+```text
+时间轴: 0.0 --------- 0.1 --------- 0.2 --------- 0.8 --------- 1.0
+        |             |             |             |             |
+       爆炸阶段        下落阶段开始    闪烁阶段开始    闪烁阶段结束    动画结束
+       ↓             ↓             ↓             ↓             ↓
+       exploding     falling       twinkling     twinkling     done
+       only         active        active        ends
+```
+
+**具体分析：**
+
+```glsl
+// 当 progress = 0.05 时：
+explodingProgress = remap(0.05, 0.0, 0.1, 0.0, 1.0) = 0.5  // ✅ 生效
+fallingProgress = remap(0.05, 0.1, 1.0, 0.0, 1.0) = -0.055... // ❌ clamp后=0
+
+// 当 progress = 0.5 时：
+explodingProgress = remap(0.5, 0.0, 0.1, 0.0, 1.0) = 5.0 // ❌ clamp后=1.0
+fallingProgress = remap(0.5, 0.1, 1.0, 0.0, 1.0) = 0.444... // ✅ 生效
+```
+
+
+
+#### 6.3 各阶段详细时间线
+
+```glsl
+// 爆炸阶段 (0.0 - 0.1)
+// 粒子从中心向外扩散
+newPosition *= explodingProgress;  // 0 → 1
+
+// 下落阶段 (0.1 - 1.0)  
+// 粒子受重力下落
+newPosition.y -= fallingProgress * 0.2;  // 0 → -0.2
+
+// 缩放阶段 (全程，但有峰值)
+// 0.0-0.125: 逐渐变大
+// 0.125-1.0: 逐渐变小
+float sizeProgress = min(sizeOpeningProgress, sizeClosingProgress);
+
+// 闪烁阶段 (0.2 - 0.8)
+// 粒子大小闪烁变化
+float sizeTwinkling = 1.0 - sizeTwinkling * twinklingProgress;
+```
+
+
+
+#### 6.4 视觉上的"续接"效果
+
+**这是因为每个阶段处理不同的属性：**
+
+- **爆炸阶段**：只影响 `position`（位置扩散）
+- **下落阶段**：只影响 `position.y`（垂直下落）
+- **缩放阶段**：只影响 `gl_PointSize`（粒子大小）
+- **闪烁阶段**：只影响 `gl_PointSize`（大小闪烁）
+
+**它们不是数学叠加，而是逻辑上的接力：**
+
+```text
+时间: 0.0-0.1    | 0.1-0.2       | 0.2-0.8         | 0.8-1.0
+     ↓           ↓              ↓                ↓
+     爆炸完成     下落开始+缩放    下落+缩放+闪烁     下落+缩放
+     位置固定     位置继续下落     位置下落+大小闪烁   位置继续下落
+```
+
+
+
+#### 6.5 关键设计思想
+
+**状态机思维：**
+
+```glsl
+// 伪代码表示状态转换
+if (progress < 0.1) {
+    // 状态1: 爆炸
+    position = explode(position);
+} else if (progress < 0.2) {
+    // 状态2: 下落开始
+    position = fall(position);
+    size = scale(size);
+} else if (progress < 0.8) {
+    // 状态3: 下落+闪烁
+    position = fall(position); 
+    size = scale(size) * twinkle();
+} else {
+    // 状态4: 下落结束
+    position = fall(position);
+    size = scale(size);
+}
+```
+
+
+
+#### 6.6 为什么不是叠加？
+
+如果是叠加，代码会是这样：
+
+```glsl
+// ❌ 错误示例：所有效果全程叠加
+newPosition *= progress;           // 爆炸全程
+newPosition.y -= progress * 0.2;   // 下落全程  
+// 这样会导致混乱的效果
+```
+
+而正确的代码是：
+
+```glsl
+// ✅ 正确示例：分时段生效
+newPosition *= explodingProgress;  // 只在0-10%生效
+newPosition.y -= fallingProgress * 0.2; // 只在10-100%生效
+```
+
+
+
+### 7. 缩放阶段的巧妙设计
+
+#### 7.1 为什么 `sizeClosingProgress` 映射到 1-0？
+
+```glsl
+float sizeClosingProgress = remap(progress, .125, 1.0, 1.0, .0);
+```
+
+**这是为了创建"先放大后缩小"的效果：**
+
+**数学原理：**
+
+```text
+当 progress = 0.125 时：remap(0.125, 0.125, 1.0, 1.0, 0.0) = 1.0
+当 progress = 0.5 时：   remap(0.5, 0.125, 1.0, 1.0, 0.0) = 0.57
+当 progress = 1.0 时：   remap(1.0, 0.125, 1.0, 1.0, 0.0) = 0.0
+```
+
+**视觉效果：**
+
+```text
+时间: 0.0 → 0.125 → 0.5 → 1.0
+大小: 0 →  1.0  → 0.57 → 0.0
+      ↑        ↑       ↑     ↑
+      开始     最大    缩小   消失
+```
+
+**这样设计的原因是模拟真实烟花：**
+
+- 爆炸瞬间：粒子快速放大
+- 后续阶段：粒子逐渐缩小直到消失
+
+
+
+#### 7.2 为什么取 `min(sizeOpeningProgress, sizeClosingProgress)`？
+
+```glsl
+float sizeProgress = min(sizeOpeningProgress, sizeClosingProgress);
+```
+
+**这是创建"山峰形"动画曲线的巧妙技巧：**
+
+**两个进度变量的行为：**
+
+```glsl
+// sizeOpeningProgress: 从 0 到 1 (0.0-0.125)
+// sizeClosingProgress: 从 1 到 0 (0.125-1.0)
+
+时间:   0.0    0.0625    0.125    0.5    1.0
+open:   0.0     0.5      1.0     1.0    1.0
+close:  1.0     1.0      1.0     0.57   0.0
+min:    0.0     0.5      1.0     0.57   0.0
+```
+
+**为什么不用 if-else？**
+
+```glsl
+// ❌ 传统方式（需要条件判断）
+float sizeProgress;
+if (progress < 0.125) {
+    sizeProgress = sizeOpeningProgress;
+} else {
+    sizeProgress = sizeClosingProgress;
+}
+
+// ✅ 优雅方式（数学技巧）
+float sizeProgress = min(sizeOpeningProgress, sizeClosingProgress);
+```
+
+**min() 的妙处：**
+
+- 在 `progress < 0.125` 时：`sizeOpeningProgress` 较小，所以取它
+- 在 `progress > 0.125` 时：`sizeClosingProgress` 较小，所以取它
+- 在 `progress = 0.125` 时：两者都是 1.0
+
+这样就自动实现了平滑的峰值转换！
+
+
+
+### 8. clamp 函数的重要性
+
+#### 8.1 为什么都要限制到 0-1？
+
+```glsl
+twinklingProgress = clamp(twinklingProgress, .0, 1.0);
+```
+
+**clamp 的作用是确保数值在有效范围内.**
+
+
+
+#### 8.2 防止超出边界的问题：
+
+**没有 clamp 的情况：**
+
+```glsl
+// 当 progress < 0.2 时：
+float twinklingProgress = remap(0.1, 0.2, 0.8, 0.0, 1.0) = -0.5
+// 负数会导致不可预测的行为！
+
+// 当 progress > 0.8 时：  
+float twinklingProgress = remap(0.9, 0.2, 0.8, 0.0, 1.0) = 1.17
+// 大于1的值可能产生过度效果！
+```
+
+**有 clamp 的情况：**
+
+```glsl
+// 确保数值始终在 [0, 1] 范围内
+twinklingProgress = clamp(twinklingProgress, 0.0, 1.0);
+```
+
+
+
+#### 8.3 各阶段 clamp 的具体作用：
+
+```glsl
+// 爆炸阶段：确保在 0.1 之后保持最大值 1.0
+explodingProgress = clamp(explodingProgress, 0.0, 1.0);
+
+// 下落阶段：确保在 0.1 之前保持最小值 0.0
+fallingProgress = clamp(fallingProgress, 0.0, 1.0);
+
+// 闪烁阶段：确保在 0.2-0.8 之外保持边界值
+twinklingProgress = clamp(twinklingProgress, 0.0, 1.0);
+
+// 缩放阶段：确保不会出现负值或超值
+sizeProgress = clamp(sizeProgress, 0.0, 1.0);
+```
 
 
 
 
 
-
+## P37
 
 
 

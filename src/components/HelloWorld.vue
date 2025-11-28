@@ -21,9 +21,8 @@ import { getTextureUrl } from "@/utils/texturesUtils";
 // 导入RectAreaLightHelper
 import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
 import * as CANNON from "cannon-es";
-import { Sky } from "three/addons/objects/Sky.js";
-import fireworkVertexShader from "@/shaders/firework/vertex.glsl?raw";
-import fireworkfragmentShader from "@/shaders/firework/fragment.glsl?raw";
+import shadingVertexShader from "@/shaders/shading/vertex.glsl?raw";
+import shadingFragmentShader from "@/shaders/shading/fragment.glsl?raw";
 
 const sizes = {
   width: 800,
@@ -113,142 +112,6 @@ loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
 loadingManager.onError = (url) => {
   console.log(`There was an error loading ${url}`);
 };
-const texturesLoader = new THREE.TextureLoader(loadingManager);
-const textures = [
-  texturesLoader.load(getTextureUrl("particles/1.png")),
-  texturesLoader.load(getTextureUrl("particles/2.png")),
-  texturesLoader.load(getTextureUrl("particles/3.png")),
-  texturesLoader.load(getTextureUrl("particles/4.png")),
-  texturesLoader.load(getTextureUrl("particles/5.png")),
-  texturesLoader.load(getTextureUrl("particles/6.png")),
-  texturesLoader.load(getTextureUrl("particles/7.png")),
-  texturesLoader.load(getTextureUrl("particles/11.png")),
-];
-
-/**
- * Fireworks
- * @param count 粒子数量
- * @param position 烟花位置
- * @param size 烟花粒子大小
- * @param texture 烟花粒子纹理
- * @param radius 烟花半径
- * @param color 烟花颜色
- */
-const createFirework = (
-  count: number,
-  position: THREE.Vector3,
-  size: number,
-  texture: THREE.Texture,
-  radius: number,
-  color: THREE.Color
-) => {
-  if (!scene) {
-    console.warn("Scene not initialized");
-    return;
-  }
-
-  // Geometry
-  const positionArray = new Float32Array(count * 3);
-  const sizesArray = new Float32Array(count);
-  const timeMultipliersArray = new Float32Array(count);
-  for (let index = 0; index < count; index++) {
-    const i3 = index * 3;
-
-    const spherical = new THREE.Spherical(
-      radius * (0.75 + 0.25 * Math.random()),
-      Math.random() * Math.PI,
-      Math.random() * Math.PI * 2
-    );
-    const position = new THREE.Vector3();
-    position.setFromSpherical(spherical);
-
-    positionArray[i3 + 0] = position.x;
-    positionArray[i3 + 1] = position.y;
-    positionArray[i3 + 2] = position.z;
-
-    sizesArray[index] = Math.random();
-
-    timeMultipliersArray[index] = 1 + Math.random();
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(positionArray, 3)
-  );
-  geometry.setAttribute(
-    "aSize",
-    new THREE.Float32BufferAttribute(sizesArray, 1)
-  );
-  geometry.setAttribute(
-    "aTimeMultiplier",
-    new THREE.Float32BufferAttribute(timeMultipliersArray, 1)
-  );
-
-  // Material
-  texture.flipY = false;
-  const material = new THREE.ShaderMaterial({
-    vertexShader: fireworkVertexShader,
-    fragmentShader: fireworkfragmentShader,
-    uniforms: {
-      uSize: new THREE.Uniform(size),
-      uResolution: new THREE.Uniform(sizes.resolution),
-      uTexture: new THREE.Uniform(texture),
-      uColor: new THREE.Uniform(color),
-      uProgress: new THREE.Uniform(0),
-    },
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-
-  // Points
-  const firework = new THREE.Points(geometry, material);
-  firework.position.copy(position);
-  scene.add(firework);
-
-  // Destroy
-  const destroy = () => {
-    scene!.remove(firework);
-    geometry.dispose();
-    material.dispose();
-  };
-
-  // Animate
-  gsap.to(material.uniforms.uProgress, {
-    value: 1,
-    duration: 3,
-    ease: "linear",
-    onComplete: destroy,
-  });
-};
-const createRandomFirework = () => {
-  const count = Math.round(400 + Math.random() * 1000);
-  const position = new THREE.Vector3(
-    (Math.random() - 0.5) * 2,
-    Math.random(),
-    (Math.random() - 0.5) * 2
-  );
-  const size = 0.1 + Math.random() * 0.1;
-  const texture = textures[Math.floor(Math.random() * textures.length)];
-  const radius = 0.5 + Math.random();
-  const color = new THREE.Color();
-  color.setHSL(Math.random(), 1, 0.7);
-
-  createFirework(count, position, size, texture, radius, color);
-};
-
-const handleClick = () => {
-  // createFirework(
-  //   1000,
-  //   new THREE.Vector3(),
-  //   0.5,
-  //   textures[7],
-  //   1,
-  //   new THREE.Color("#8affff")
-  // );
-  createRandomFirework();
-};
 
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
@@ -260,6 +123,59 @@ onMounted(() => {
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 模型mesh======================
+  /**
+   * Material
+   */
+  const materialParameters = { color: "#ffffff" };
+
+  const material = new THREE.ShaderMaterial({
+    vertexShader: shadingVertexShader,
+    fragmentShader: shadingFragmentShader,
+    uniforms: {
+      uColor: new THREE.Uniform(new THREE.Color(materialParameters.color)),
+    },
+  });
+
+  /**
+   * Objects
+   */
+  // Torus knot
+  const torusKnot = new THREE.Mesh(
+    new THREE.TorusKnotGeometry(0.6, 0.25, 128, 32),
+    material
+  );
+  torusKnot.position.x = 3;
+  scene.add(torusKnot);
+
+  // Sphere
+  const sphere = new THREE.Mesh(new THREE.SphereGeometry(), material);
+  sphere.position.x = -3;
+  scene.add(sphere);
+
+  // Suzanne
+  let suzanne: THREE.Group | null = null;
+  // 3. 执行加载
+  gltfLoader.load(
+    modelPath,
+    // 加载成功回调
+    (gltf) => {
+      suzanne = gltf.scene;
+      suzanne.traverse((child) => {
+        if (child.isMesh) child.material = material;
+      });
+
+      // 关键：添加整个模型场景（含完整层级，避免漏元素）
+      scene!.add(gltf.scene);
+    },
+    // 加载进度回调
+    (xhr) => {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
+    // 加载错误回调
+    (error) => {
+      console.error("加载失败：", error);
+    }
+  );
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -275,7 +191,9 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(1.5, 0, 6);
+  camera.position.x = 7;
+  camera.position.y = 7;
+  camera.position.z = 7;
   scene.add(camera);
 
   // Controls
@@ -283,51 +201,11 @@ onMounted(() => {
   controls.enableDamping = true;
 
   // 创建渲染器对象
-  const rendererParameters = { clearColor: "#1d1f2a" };
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(sizes.pixelRatio);
 
   webgl.value!.appendChild(renderer.domElement);
-
-  /**
-   * Sky
-   */
-  const sky = new Sky();
-  sky.scale.setScalar(450000);
-  scene.add(sky);
-
-  const sun = new THREE.Vector3();
-
-  const skyParameters = {
-    turbidity: 10,
-    rayleigh: 3,
-    mieCoefficient: 0.005,
-    mieDirectionalG: 0.95,
-    elevation: -2.2,
-    azimuth: 180,
-    exposure: renderer.toneMappingExposure,
-  };
-
-  const updateSky = () => {
-    const uniforms = sky.material.uniforms;
-    uniforms["turbidity"].value = skyParameters.turbidity;
-    uniforms["rayleigh"].value = skyParameters.rayleigh;
-    uniforms["mieCoefficient"].value = skyParameters.mieCoefficient;
-    uniforms["mieDirectionalG"].value = skyParameters.mieDirectionalG;
-
-    const phi = THREE.MathUtils.degToRad(90 - skyParameters.elevation);
-    const theta = THREE.MathUtils.degToRad(skyParameters.azimuth);
-
-    sun.setFromSphericalCoords(1, phi, theta);
-
-    uniforms["sunPosition"].value.copy(sun);
-
-    renderer!.toneMappingExposure = skyParameters.exposure;
-    renderer!.render(scene!, camera!);
-  };
-
-  updateSky();
 
   const clock = new THREE.Clock(); //创建一个时钟对象，用于计算时间差
   function render() {
@@ -335,6 +213,18 @@ onMounted(() => {
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
+
+    // Rotate objects
+    if (suzanne) {
+      suzanne.rotation.x = -elapsedTime * 0.1;
+      suzanne.rotation.y = elapsedTime * 0.2;
+    }
+
+    sphere.rotation.x = -elapsedTime * 0.1;
+    sphere.rotation.y = elapsedTime * 0.2;
+
+    torusKnot.rotation.x = -elapsedTime * 0.1;
+    torusKnot.rotation.y = elapsedTime * 0.2;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -353,13 +243,10 @@ onMounted(() => {
   // 创建GUI===================
   gui = new GUI();
 
-  gui.add(skyParameters, "turbidity", 0.0, 20.0, 0.1).onChange(updateSky);
-  gui.add(skyParameters, "rayleigh", 0.0, 4, 0.001).onChange(updateSky);
-  gui.add(skyParameters, "mieCoefficient", 0.0, 0.1, 0.001).onChange(updateSky);
-  gui.add(skyParameters, "mieDirectionalG", 0.0, 1, 0.001).onChange(updateSky);
-  gui.add(skyParameters, "elevation", -3, 10, 0.01).onChange(updateSky);
-  gui.add(skyParameters, "azimuth", -180, 180, 0.1).onChange(updateSky);
-  gui.add(skyParameters, "exposure", 0, 1, 0.0001).onChange(updateSky);
+  gui.addColor(materialParameters, "color").onChange(() => {
+    material.uniforms.uColor.value.set(materialParameters.color);
+  });
+  gui;
   // 创建GUI===================
 });
 
@@ -389,7 +276,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="container" @click="handleClick">
+  <div class="container">
     <div ref="webgl" class="webgl"></div>
   </div>
 </template>

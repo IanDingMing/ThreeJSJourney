@@ -2024,9 +2024,181 @@ sizeProgress = clamp(sizeProgress, 0.0, 1.0);
 
 
 
-## P37
+## P37 Lights Shading Shaders
+
+### 难点1：光照模型实现
+
+#### 环境光 (Ambient Light)
+
+```glsl
+// 环境光函数
+// 参数：
+//   lightColor (vec3) - 环境光颜色，RGB值范围0.0-1.0
+//   lightIntensity (float) - 环境光强度，控制整体亮度
+// 返回值：
+//   vec3 - 计算得到的环境光颜色值
+vec3 ambientLight(vec3 lightColor, float lightIntensity) {
+    return lightColor * lightIntensity;
+}
+```
+
+- 最简单的光照，模拟环境漫反射
+- 无方向性，均匀照亮所有表面
 
 
+
+#### 平行光 (Directional Light)
+
+```glsl
+// 平行光函数
+// 参数：
+//   lightColor (vec3) - 平行光颜色，RGB值范围0.0-1.0
+//   lightIntensity (float) - 平行光强度，控制亮度
+//   normal (vec3) - 表面法线向量，必须归一化
+//   lightPosition (vec3) - 平行光方向向量，实际作为方向使用
+//   viewDirection (vec3) - 视线方向向量，从表面指向相机
+//   specularPower (float) - 高光强度系数，值越大高光越集中
+// 返回值：
+//   vec3 - 计算得到的平行光颜色值（包含漫反射和镜面反射）
+vec3 directionalLight(vec3 lightColor, float lightIntensity, 
+                     vec3 normal, vec3 lightPosition, 
+                     vec3 viewDirection, float specularPower) {
+    // 计算光线方向
+    vec3 lightDirection = normalize(lightPosition);
+    
+    // 漫反射计算 (Lambert模型)
+    float shading = dot(normal, lightDirection);
+    shading = max(.0, shading);
+    
+    // 镜面反射计算 (Phong模型)
+    vec3 lightReflection = reflect(-lightDirection, normal);
+    float specular = -dot(lightReflection, viewDirection);
+    specular = max(.0, specular);
+    specular = pow(specular, specularPower);
+    
+    return lightColor * lightIntensity * (shading + specular);
+}
+```
+
+
+
+#### 点光源 (Point Light)
+
+```glsl
+// 点光源函数
+// 参数：
+//   lightColor (vec3) - 点光源颜色，RGB值范围0.0-1.0
+//   lightIntensity (float) - 点光源强度，控制亮度
+//   normal (vec3) - 表面法线向量，必须归一化
+//   lightPosition (vec3) - 点光源实际位置坐标
+//   viewDirection (vec3) - 视线方向向量，从表面指向相机
+//   specularPower (float) - 高光强度系数，值越大高光越集中
+//   position (vec3) - 当前表面点的世界坐标位置
+//   lightDecay (float) - 光线衰减系数，控制随距离衰减的速度
+// 返回值：
+//   vec3 - 计算得到的点光源颜色值（包含衰减、漫反射和镜面反射）
+vec3 pointLight(vec3 lightColor, float lightIntensity, 
+               vec3 normal, vec3 lightPosition, 
+               vec3 viewDirection, float specularPower, 
+               vec3 position, float lightDecay) {
+    // 计算光线方向和距离
+    vec3 lightDelta = lightPosition - position;
+    float lightDistance = length(lightDelta);
+    vec3 lightDirection = normalize(lightDelta);
+    
+    // 漫反射和镜面反射计算
+    // ... (同平行光)
+    
+    // 衰减计算
+    float decay = 1.0 - lightDistance * lightDecay;
+    decay = max(.0, decay);
+    
+    return lightColor * lightIntensity * decay * (shading + specular);
+}
+```
+
+
+
+### 难点2：向量计算与坐标系转换
+
+#### 1. 光线方向计算
+
+```glsl
+// 平行光（方向固定）
+vec3 lightDirection = normalize(lightPosition);
+
+// 点光源（方向随位置变化）
+vec3 lightDelta = lightPosition - position;
+float lightDistance = length(lightDelta);
+vec3 lightDirection = normalize(lightDelta);
+```
+
+#### 2. 反射向量计算
+
+```glsl
+vec3 lightReflection = reflect(-lightDirection, normal);
+```
+
+- `reflect(I, N)` 函数：计算入射向量 I 在法线 N 上的反射
+- `-lightDirection`：因为需要从表面指向光源的方向
+
+#### 3. 漫反射计算（Lambert模型）
+
+```glsl
+float shading = dot(normal, lightDirection);
+shading = max(0.0, shading);
+```
+
+- `dot(normal, lightDirection)`：计算余弦值
+- `max(0.0, shading)`：确保不会出现负值（背面不受光）
+
+#### 4. 镜面反射计算（Phong模型）
+
+```glsl
+float specular = -dot(lightReflection, viewDirection);
+specular = max(0.0, specular);
+specular = pow(specular, specularPower);
+```
+
+- `-dot(lightReflection, viewDirection)`：视线与反射方向的夹角
+- `pow(specular, specularPower)`：控制高光的锐利程度
+
+
+
+### 难点3：光照叠加与颜色混合
+
+```glsl
+// 环境光 - 基础照明
+light += ambientLight(vec3(1.0), 0.03);
+
+// 蓝色平行光 - 从z轴方向照射
+light += directionalLight(
+    vec3(0.1, 0.1, 1.0), // 蓝色光
+    1.0,                  // 强度
+    normal,               // 表面法线
+    vec3(0.0, 0.0, 3.0), // 光的方向（实际当作方向使用）
+    viewDirection,        // 视线方向
+    20.0                  // 高光锐度
+);
+
+// 红色点光源 - 在y轴2.5位置
+light += pointLight(
+    vec3(1.0, 0.1, 0.1), // 红色光
+    1.0,                  // 强度
+    normal,               // 表面法线
+    vec3(0.0, 2.5, 0.0), // 光源位置
+    viewDirection,        // 视线方向
+    20.0,                 // 高光锐度
+    vPosition,            // 表面点位置
+    0.25                  // 衰减系数
+);
+
+color *= light;
+```
+
+
+
+## P38
 
 
 

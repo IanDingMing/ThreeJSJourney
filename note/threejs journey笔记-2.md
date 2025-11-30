@@ -2198,7 +2198,126 @@ color *= light;
 
 
 
-## P38
+## P38 Raging Sea Shading Shaders
+
+### 为什么必须在片元着色器中进行归一化，而不是在顶点着色器传入时候直接计算好传入，这有什么区别吗？
+
+```glsl
+片元着色器：  vec3 normal = normalize(vNormal);
+
+顶点着色器：  vNormal = normalize(computedNormal);
+```
+
+答：**有区别，必须在片元着色器中进行归一化。**因为仅在顶点着色器中归一化，片元着色器直接使用，会导致大量点没有归一化，**顶点着色器的点传入片元着色器，会进行插值计算**。
+
+#### 数据流与插值机制
+
+```text
+顶点着色器输出 → 光栅化插值 → 片元着色器输入
+```
+
+**关键理解**：
+
+- **顶点着色器**：在模型的每个顶点执行
+- **片元着色器**：在渲染的每个像素执行
+- **插值过程**：GPU自动在**三角形顶点之间生成过渡值**
+
+#### 顶点 vs 片元的数量关系
+
+```glsl
+// 顶点着色器：执行次数 = 模型顶点数
+// 例如：一个三角形只执行3次
+
+// 片元着色器：执行次数 = 屏幕像素数  
+// 例如：一个三角形可能覆盖成百上千个像素
+```
+
+**关键区别**：
+
+- 顶点着色器处理的是**稀疏的顶点数据**
+- 片元着色器处理的是**密集的像素数据**
+- 两者之间通过**光栅化插值**连接
+
+#### 归一化问题的本质
+
+**写法对比**：
+
+```glsl
+// ❌ 错误做法：只在顶点归一化
+顶点着色器：vNormal = normalize(computedNormal);
+片元着色器：vec3 normal = vNormal;  // 直接使用
+
+// ✅ 正确做法：在片元重新归一化  
+顶点着色器：vNormal = computedNormal;  // 传递原始向量
+片元着色器：vec3 normal = normalize(vNormal);  // 重新归一化
+```
+
+
+
+### 水面法线计算技术详解
+
+#### 动态法线计算原理
+
+```glsl
+// 1. 计算当前点高度
+float elevation = waveElevation(modelPosition.xyz);
+
+// 2. 计算相邻点高度（微小偏移）
+vec3 modelPositionA = modelPosition.xyz + vec3(shift, .0, .0);
+vec3 modelPositionB = modelPosition.xyz + vec3(.0, .0, -shift);
+float elevationA = waveElevation(modelPositionA);
+float elevationB = waveElevation(modelPositionB);
+
+// 3. 构建切线向量
+vec3 toA = normalize(modelPositionA - modelPosition.xyz);
+vec3 toB = normalize(modelPositionB - modelPosition.xyz);
+
+// 4. 叉积计算法线
+vec3 computedNormal = cross(toA, toB);
+```
+
+#### 技术要点解析
+
+**为什么需要动态计算**：
+
+- 水面高度实时变化，无法使用预计算的法线
+- 每个帧都需要根据当前波浪状态重新计算
+
+**微小偏移的作用**：
+
+- 模拟表面局部曲率
+- 通过相邻点的高度差计算表面倾斜度
+- 偏移量越小，计算的法线越精确
+
+#### 实际应用建议
+
+性能优化考虑
+
+```glsl
+// 权衡：精度 vs 性能
+const float shift = 0.01;  // 偏移量调节
+// 较小值：更精确但可能数值不稳定
+// 较大值：更稳定但精度降低
+```
+
+调试技巧
+
+```glsl
+// 法线可视化调试
+#ifdef DEBUG_NORMALS
+    color = normal * 0.5 + 0.5;  // 将法线映射到颜色空间
+#endif
+
+// 长度检查
+float normalLength = length(vNormal);
+if(normalLength < 0.9 || normalLength > 1.1) {
+    color = vec3(1.0, 0.0, 0.0);  // 标记异常区域
+}
+```
+
+
+
+## P39
 
 
 

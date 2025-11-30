@@ -21,19 +21,13 @@ import { getTextureUrl } from "@/utils/texturesUtils";
 // 导入RectAreaLightHelper
 import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
 import * as CANNON from "cannon-es";
-import shadingVertexShader from "@/shaders/shading/vertex.glsl?raw";
-import shadingFragmentShader from "@/shaders/shading/fragment.glsl?raw";
+import waterVertexShader from "@/shaders/water2/vertex.glsl?raw";
+import waterFragmentShader from "@/shaders/water2/fragment.glsl?raw";
 
 const sizes = {
   width: 800,
   height: 600,
-  resolution: new THREE.Vector2(800, 600),
-  pixelRatio: Math.min(window.devicePixelRatio, 2),
 };
-sizes.resolution.set(
-  sizes.width * sizes.pixelRatio,
-  sizes.height * sizes.pixelRatio
-);
 const webgl = useTemplateRef("webgl");
 
 // 1. 声明需要复用的变量
@@ -44,7 +38,6 @@ let gui: GUI | null = null;
 const meshArray: THREE.Mesh[] = [];
 const global = { envMapIntensity: 1 };
 let modelFlightHelmet: THREE.Group | null = null;
-let scene: THREE.Scene | null = null;
 
 // 2. 声明事件处理函数
 const handleResize = () => {
@@ -54,17 +47,12 @@ const handleResize = () => {
   const container = webgl.value;
   sizes.width = container.clientWidth;
   sizes.height = container.clientHeight;
-  sizes.pixelRatio = Math.min(window.devicePixelRatio, 2);
-  sizes.resolution.set(
-    sizes.width * sizes.pixelRatio,
-    sizes.height * sizes.pixelRatio
-  );
 
   // 更新相机和渲染器
   camera.aspect = sizes.width / sizes.height;
   camera.updateProjectionMatrix();
   renderer.setSize(sizes.width, sizes.height);
-  renderer.setPixelRatio(sizes.pixelRatio);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
   // 更新控制器（如果存在）
   if (controls) controls.update();
@@ -85,130 +73,55 @@ const handleDoubleClick = () => {
   }
 };
 
-/**
- * 模型加载
- */
-// 1. 初始化加载器
-const gltfLoader = new GLTFLoader();
-
-// 2. 定义模型路径（支持 gltf/glb 等格式）
-const modelPath = `${import.meta.env.BASE_URL}models/suzanne.glb`; // 文件路径：/public/models/Duck
-
-/**
- * Textures加载
- */
-const loadingManager = new THREE.LoadingManager();
-loadingManager.onStart = () => {
-  console.log("Loading started");
-};
-loadingManager.onLoad = () => {
-  console.log("Loading complete");
-};
-loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-  console.log(
-    `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
-  );
-};
-loadingManager.onError = (url) => {
-  console.log(`There was an error loading ${url}`);
-};
-
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
   sizes.height = webgl.value!.clientHeight;
 
   // 创建3D场景对象Scene
-  scene = new THREE.Scene();
+  const scene = new THREE.Scene();
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
-  // 模型mesh======================
-  /**
-   * Material
-   */
-  const materialParameters = { color: "#ffffff" };
+  // 模型mesh==========================
 
-  const material = new THREE.ShaderMaterial({
-    vertexShader: shadingVertexShader,
-    fragmentShader: shadingFragmentShader,
+  /**
+   * Water
+   */
+  // Geometry
+  const waterGeometry = new THREE.PlaneGeometry(2, 2, 512, 512);
+
+  // Color
+  const debugObject = {
+    depthColor: "#186691",
+    sufaceColor: "#9bd8ff",
+  };
+
+  // Material
+  const waterMaterial = new THREE.ShaderMaterial({
+    vertexShader: waterVertexShader,
+    fragmentShader: waterFragmentShader,
     uniforms: {
-      uColor: new THREE.Uniform(new THREE.Color(materialParameters.color)),
+      uTime: { value: 0 },
+      uBigWavesElevation: { value: 0.2 },
+      uBigWavesFrenquency: { value: new THREE.Vector2(4, 1.5) },
+      uBigWavesSpeed: { value: 0.75 },
+
+      uSmallWavesElevation: { value: 0.15 },
+      uSmallWavesFrequency: { value: 3 },
+      uSmallWavesSpeed: { value: 0.2 },
+      uSmallIterations: { value: 4 },
+
+      uDepthColor: { value: new THREE.Color(debugObject.depthColor) },
+      uSufaceColor: { value: new THREE.Color(debugObject.sufaceColor) },
+      uColorOffset: { value: 0.08 },
+      uColorMultiplier: { value: 5 },
     },
   });
 
-  /**
-   * Objects
-   */
-  // Torus knot
-  const torusKnot = new THREE.Mesh(
-    new THREE.TorusKnotGeometry(0.6, 0.25, 128, 32),
-    material
-  );
-  torusKnot.position.x = 3;
-  scene.add(torusKnot);
-
-  // Sphere
-  const sphere = new THREE.Mesh(new THREE.SphereGeometry(), material);
-  sphere.position.x = -3;
-  scene.add(sphere);
-
-  // Suzanne
-  let suzanne: THREE.Group | null = null;
-  // 3. 执行加载
-  gltfLoader.load(
-    modelPath,
-    // 加载成功回调
-    (gltf) => {
-      suzanne = gltf.scene;
-      suzanne.traverse((child) => {
-        if (child.isMesh) child.material = material;
-      });
-
-      // 关键：添加整个模型场景（含完整层级，避免漏元素）
-      scene!.add(gltf.scene);
-    },
-    // 加载进度回调
-    (xhr) => {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    // 加载错误回调
-    (error) => {
-      console.error("加载失败：", error);
-    }
-  );
-
-  /**
-   * Light helpers
-   */
-  // Directional light helpers
-  const directionalLightHelper = new THREE.Mesh(
-    new THREE.PlaneGeometry(),
-    new THREE.MeshBasicMaterial()
-  );
-  directionalLightHelper.material.color.setRGB(0.1, 0.1, 1);
-  directionalLightHelper.material.side = THREE.DoubleSide;
-  directionalLightHelper.position.set(0, 0, 3);
-  scene.add(directionalLightHelper);
-
-  // Point light helpers
-  const pointLightHelper = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(0.1, 2),
-    new THREE.MeshBasicMaterial()
-  );
-  pointLightHelper.material.color.setRGB(1, 0.1, 0.1);
-  pointLightHelper.material.side = THREE.DoubleSide;
-  pointLightHelper.position.set(0, 2.5, 0);
-  scene.add(pointLightHelper);
-
-  // Point light helpers 2
-  const pointLightHelper2 = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(0.1, 2),
-    new THREE.MeshBasicMaterial()
-  );
-  pointLightHelper2.material.color.setRGB(0.1, 1.0, 0.5);
-  pointLightHelper2.material.side = THREE.DoubleSide;
-  pointLightHelper2.position.set(2, 2, 2);
-  scene.add(pointLightHelper2);
+  // Mesh
+  const water = new THREE.Mesh(waterGeometry, waterMaterial);
+  water.rotation.x = -Math.PI * 0.5;
+  scene.add(water);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -218,15 +131,13 @@ onMounted(() => {
    * Camera
    */
   // Base camera
-  camera = new THREE.PerspectiveCamera(
-    25,
+  const camera = new THREE.PerspectiveCamera(
+    75,
     sizes.width / sizes.height,
     0.1,
     100
   );
-  camera.position.x = 7;
-  camera.position.y = 7;
-  camera.position.z = 7;
+  camera.position.set(1, 1, 1);
   scene.add(camera);
 
   // Controls
@@ -236,7 +147,8 @@ onMounted(() => {
   // 创建渲染器对象
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
-  renderer.setPixelRatio(sizes.pixelRatio);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // renderer.setClearColor(new THREE.Color("#262837")); //设置渲染器的背景颜色
 
   webgl.value!.appendChild(renderer.domElement);
 
@@ -247,17 +159,8 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
-    // Rotate objects
-    if (suzanne) {
-      suzanne.rotation.x = -elapsedTime * 0.1;
-      suzanne.rotation.y = elapsedTime * 0.2;
-    }
-
-    sphere.rotation.x = -elapsedTime * 0.1;
-    sphere.rotation.y = elapsedTime * 0.2;
-
-    torusKnot.rotation.x = -elapsedTime * 0.1;
-    torusKnot.rotation.y = elapsedTime * 0.2;
+    // Update water
+    waterMaterial.uniforms.uTime.value = elapsedTime;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -265,7 +168,7 @@ onMounted(() => {
     // Update controls
     controls.update();
 
-    renderer.render(scene!, camera); //执行渲染操作
+    renderer.render(scene, camera); //执行渲染操作
     requestAnimationFrame(render); //请求再次执行函数render
   }
   render();
@@ -276,13 +179,52 @@ onMounted(() => {
   // 创建GUI===================
   gui = new GUI();
 
-  gui.addColor(materialParameters, "color").onChange(() => {
-    material.uniforms.uColor.value.set(materialParameters.color);
-  });
-  gui;
+  gui
+    .add(waterMaterial.uniforms.uBigWavesElevation, "value", 0, 1, 0.001)
+    .name("uBigWavesElevation");
+  gui
+    .add(waterMaterial.uniforms.uBigWavesFrenquency.value, "x", 0, 10, 0.001)
+    .name("uBigWavesFrenquencyX");
+  gui
+    .add(waterMaterial.uniforms.uBigWavesFrenquency.value, "y", 0, 10, 0.001)
+    .name("uBigWavesFrenquencyY");
+  gui
+    .add(waterMaterial.uniforms.uBigWavesSpeed, "value", 0, 4, 0.001)
+    .name("uBigWavesSpeed");
+
+  gui
+    .add(waterMaterial.uniforms.uSmallWavesElevation, "value", 0, 1, 0.001)
+    .name("uSmallWavesElevation");
+  gui
+    .add(waterMaterial.uniforms.uSmallWavesFrequency, "value", 0, 30, 0.001)
+    .name("uSmallWavesFrequency");
+  gui
+    .add(waterMaterial.uniforms.uSmallWavesSpeed, "value", 0, 4, 0.001)
+    .name("uSmallWavesSpeed");
+  gui
+    .add(waterMaterial.uniforms.uSmallIterations, "value", 0, 5, 1)
+    .name("uSmallIterations");
+
+  gui
+    .addColor(debugObject, "depthColor")
+    .name("depthColor")
+    .onChange(() => {
+      waterMaterial.uniforms.uDepthColor.value.set(debugObject.depthColor);
+    });
+  gui
+    .addColor(debugObject, "sufaceColor")
+    .name("sufaceColor")
+    .onChange(() => {
+      waterMaterial.uniforms.uSufaceColor.value.set(debugObject.sufaceColor);
+    });
+  gui
+    .add(waterMaterial.uniforms.uColorOffset, "value", 0, 1, 0.001)
+    .name("uColorOffset");
+  gui
+    .add(waterMaterial.uniforms.uColorMultiplier, "value", 0, 10, 0.001)
+    .name("uColorMultiplier");
   // 创建GUI===================
 });
-
 // 组件卸载时移除事件监听
 onUnmounted(() => {
   // 移除事件监听
@@ -301,7 +243,6 @@ onUnmounted(() => {
     gui = null;
   }
   camera = null;
-  scene = null; // 清理 scene
   // 清空前释放材质/几何体
   meshArray.forEach((mesh) => {});
   meshArray.length = 0; // 再清空数组

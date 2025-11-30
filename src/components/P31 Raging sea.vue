@@ -92,8 +92,8 @@ onMounted(() => {
 
   // Color
   const debugObject = {
-    depthColor: "#0000ff",
-    sufaceColor: "#8888ff",
+    depthColor: "#186691",
+    sufaceColor: "#9bd8ff",
   };
 
   // Material
@@ -113,8 +113,8 @@ onMounted(() => {
 
       uDepthColor: { value: new THREE.Color(debugObject.depthColor) },
       uSufaceColor: { value: new THREE.Color(debugObject.sufaceColor) },
-      uColorOffset: { value: 0.25 },
-      uColorMultiplier: { value: 2 },
+      uColorOffset: { value: 0.08 },
+      uColorMultiplier: { value: 5 },
     },
   });
 
@@ -137,7 +137,6 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(0.25, -0.25, 1);
   camera.position.set(1, 1, 1);
   scene.add(camera);
 

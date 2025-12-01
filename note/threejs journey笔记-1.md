@@ -1,6 +1,8 @@
 ## 项目插件
 
-### ⚙️ 核心配置步骤
+### [vite-plugin-glsl](https://www.npmjs.com/package/vite-plugin-glsl?activeTab=readme)
+
+#### ⚙️ 核心配置步骤
 
 1. **安装插件**
    在你的 Vite 项目中，通过 npm 或其他包管理器安装插件：
@@ -52,7 +54,7 @@
 
    
 
-### 🔧 插件配置选项详解
+#### 🔧 插件配置选项详解
 
 插件支持一个配置对象，让你可以根据项目需求灵活调整行为。以下是官方文档中各个选项的含义：
 
@@ -91,7 +93,7 @@ export default defineConfig({
 
 
 
-### 🚀 使用与技巧
+#### 🚀 使用与技巧
 
 - **导入着色器**：配置完成后，你就可以在 JavaScript 或 TypeScript 代码中直接导入着色器文件了。导入的内容是一个字符串。
 

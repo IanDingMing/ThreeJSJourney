@@ -661,6 +661,9 @@ float strength = strength1 + strength2;           // 水平和垂直条纹相加
 **关键函数解析：**
 
 - `mod(x, y)`: 取模运算，实现重复模式
+
+[`mod(x, y)`详解](#`mod(x, y)`详解)
+
 - `step(edge, x)`: 阶梯函数，x≥edge返回1，否则返回0
 
 
@@ -2317,7 +2320,124 @@ if(normalLength < 0.9 || normalLength > 1.1) {
 
 
 
-## P39
+## P39 Halftone Shading Shaders
+
+### 一、内置变量：gl_FragCoord vs gl_PointCoord
+
+#### 1.1 核心区别
+
+| 变量              | 含义                               | 坐标系                               | 有效条件                | 主要用途                       |
+| :---------------- | :--------------------------------- | :----------------------------------- | :---------------------- | :----------------------------- |
+| **gl_FragCoord**  | 当前像素在**屏幕窗口**的绝对坐标   | 窗口坐标系，原点在左下角             | 始终有效                | 屏幕空间效果、后处理、深度计算 |
+| **gl_PointCoord** | 当前像素在**点精灵**内部的相对坐标 | 纹理坐标系，原点在左上角(0,0)到(1,1) | 仅绘制`GL_POINTS`时有效 | 点精灵贴图、内部形状生成       |
+
+#### 1.2 关键要点
+
+- **gl_FragCoord**：用于知道"这个像素在屏幕哪里"
+- **gl_PointCoord**：用于知道"这个像素在当前点图案里的位置"
+- 点精灵示例：绘制圆形粒子
+
+```glsl
+float dist = distance(gl_PointCoord, vec2(0.5));
+if(dist > 0.5) discard;
+```
+
+
+
+### 二、mod(x, y)函数详解
+
+#### 2.1 数学定义
+
+- 计算公式：`mod(x, y) = x - y * floor(x/y)`
+- 返回x除以y的余数
+
+#### 2.2 主要用途
+
+1. **创建重复图案（平铺）**
+
+```glsl
+vec2 tiledUV = mod(uv * repeatCount, 1.0);
+```
+
+2. **循环动画**
+
+```glsl
+float progress = mod(time, duration) / duration;
+```
+
+3. **限制范围**
+
+```glsl
+float angle = mod(theta, 2.0 * PI);  // 限制在[0, 2π)
+```
+
+#### 2.3 与其他取余函数的区别
+
+##### `mod` vs `fract`
+
+```glsl
+// mod(x, 1.0) 等价于取小数部分
+float a = mod(3.7, 1.0);     // a = 0.7
+float b = fract(3.7);        // b = 0.7 （fract 返回小数部分）
+
+// 但 fract(x) 更高效，因为它等价于 x - floor(x)
+```
+
+##### `mod` vs `step` 模式
+
+```glsl
+// 使用 mod 创建步进模式
+void main() {
+    vec2 uv = gl_FragCoord.xy / resolution.xy;
+    
+    // 创建 10 个垂直条纹
+    float stripe = mod(uv.x * 10.0, 1.0);
+    float stripePattern = step(0.5, stripe);  // 当 stripe >= 0.5 时返回 1
+    
+    fragColor = vec4(vec3(stripePattern), 1.0);
+}
+```
+
+#### 2.4 性能优化
+
+- 用`fract(x)`代替`mod(x, 1.0)`更高效
+- 避免在片段着色器循环中频繁使用
+
+
+
+### 三、smoothstep的非线性映射
+
+#### 3.1 函数原理
+
+```glsl
+smoothstep(low, high, x)：
+- x ≤ low：返回 0
+- x ≥ high：返回 1
+- 中间：平滑的三次Hermite插值
+```
+
+#### 3.2 参数设置意义
+
+```glsl
+// 示例：创建胶片曲线效果
+float low = -0.8;   // 暗部截断点
+float high = 1.5;   // 亮部压缩点
+intensity = smoothstep(low, high, intensity);  // intensity范围[-1,1]
+```
+
+#### 3.3 视觉影响分析
+
+| 参数设置                   | 暗部处理         | 亮部处理        | 整体效果             |
+| :------------------------- | :--------------- | :-------------- | :------------------- |
+| `smoothstep(-1.0, 1.0, x)` | 完整保留         | 完整保留        | 线性映射，对比度不变 |
+| `smoothstep(-0.8, 1.5, x)` | 压缩(-1到-0.8→0) | 压缩(1.0→0.878) | 暗部提升，亮部压暗   |
+| `smoothstep(-1.2, 0.8, x)` | 扩展(暗部更暗)   | 扩展(亮部更亮)  | 高对比度，HDR风格    |
+
+
+
+
+
+
 
 # 附录
 
@@ -2687,9 +2807,228 @@ float cnoise(vec2 P) {
 }
 ```
 
+------
 
+
+
+## `mod(x, y)`详解
+
+`mod(x, y)` 是 GLSL 中的一个**内置数学函数**，用于计算**模运算**（取余数）。它返回 `x` 除以 `y` 的余数。
+
+### 基本语法
+
+```glsl
+float mod(float x, float y)      // 用于浮点数
+vec2 mod(vec2 x, vec2 y)         // 用于二维向量
+vec3 mod(vec3 x, vec3 y)         // 用于三维向量
+vec4 mod(vec4 x, vec4 y)         // 用于四维向量
+```
+
+
+
+### 数学定义
+
+```glsl
+mod(x, y)` 等价于：`x - y * floor(x/y)
+```
+
+
+
+### 示例和用途
+
+#### 1. **基本取余运算**
+
+```glsl
+float a = mod(7.0, 3.0);    // a = 1.0 (7 ÷ 3 = 2 余 1)
+float b = mod(5.5, 2.0);    // b = 1.5 (5.5 ÷ 2 = 2 余 1.5)
+float c = mod(2.0, 1.5);    // c = 0.5 (2.0 ÷ 1.5 = 1 余 0.5)
+```
+
+#### 2. **负数的模运算**
+
+```glsl
+float d = mod(-1.0, 3.0);   // d = 2.0
+float e = mod(1.0, -3.0);   // e = -2.0
+float f = mod(-2.0, 3.0);   // f = 1.0
+```
+
+#### 3. **创建重复图案（平铺效果）**
+
+这是 `mod` 在着色器中最常见的用途：
+
+```glsl
+// 创建 5x5 的平铺网格
+vec2 uv = gl_FragCoord.xy / resolution.xy;
+vec2 tiledUV = mod(uv * 5.0, 1.0);
+vec3 color = texture2D(texture, tiledUV).rgb;
+```
+
+#### 4. **制作棋盘格效果**
+
+```glsl
+void main() {
+    vec2 uv = gl_FragCoord.xy / resolution.xy;
+    vec2 grid = floor(mod(uv * 10.0, 2.0));
+    float checker = mod(grid.x + grid.y, 2.0);
+    vec3 color = mix(vec3(1.0), vec3(0.0), checker);
+    fragColor = vec4(color, 1.0);
+}
+```
+
+#### 5. **周期性动画**
+
+```glsl
+uniform float time;
+
+void main() {
+    // 使用 mod 让动画循环（0-1 循环）
+    float progress = mod(time, 3.0) / 3.0;  // 每3秒循环一次
+    
+    // 或使用 sin 结合 mod 创建更复杂的循环
+    float pulse = sin(mod(time, 2.0 * 3.14159));
+}
+```
+
+#### 6. **限制范围**
+
+```glsl
+// 将角度限制在 [0, 2π) 范围内
+float angle = mod(theta, 2.0 * 3.14159);
+
+// 将坐标限制在 [0, size) 范围内
+float wrappedX = mod(position.x, size);
+```
+
+
+
+### 与其他取余函数的区别
+
+#### `mod` vs `fract`
+
+```glsl
+// mod(x, 1.0) 等价于取小数部分
+float a = mod(3.7, 1.0);     // a = 0.7
+float b = fract(3.7);        // b = 0.7 （fract 返回小数部分）
+
+// 但 fract(x) 更高效，因为它等价于 x - floor(x)
+```
+
+#### `mod` vs `step` 模式
+
+```glsl
+// 使用 mod 创建步进模式
+void main() {
+    vec2 uv = gl_FragCoord.xy / resolution.xy;
+    
+    // 创建 10 个垂直条纹
+    float stripe = mod(uv.x * 10.0, 1.0);
+    float stripePattern = step(0.5, stripe);  // 当 stripe >= 0.5 时返回 1
+    
+    fragColor = vec4(vec3(stripePattern), 1.0);
+}
+```
+
+
+
+### 向量版本的特殊用法
+
+#### 分量独立取余
+
+```glsl
+vec2 pos = vec2(7.5, 4.3);
+vec2 divisor = vec2(2.0, 1.5);
+vec2 remainder = mod(pos, divisor);  // vec2(1.5, 1.3)
+
+// 解释：
+// x分量：mod(7.5, 2.0) = 1.5
+// y分量：mod(4.3, 1.5) = 1.3
+```
+
+#### 统一除数
+
+```glsl
+vec3 pos = vec3(5.0, 7.0, 9.0);
+vec3 remainder = mod(pos, 3.0);  // vec3(2.0, 1.0, 0.0)
+```
+
+
+
+### 实际应用示例
+
+#### 1. **制作无限滚动的背景**
+
+```glsl
+uniform float scrollSpeed;
+uniform float time;
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / resolution.xy;
+    
+    // 创建滚动的UV坐标
+    vec2 scrollingUV = uv;
+    scrollingUV.y += time * scrollSpeed;
+    
+    // 使用 mod 让纹理无限重复
+    vec2 repeatedUV = mod(scrollingUV, 1.0);
+    
+    vec3 color = texture2D(backgroundTexture, repeatedUV).rgb;
+    fragColor = vec4(color, 1.0);
+}
+```
+
+#### 2. **制作伪随机分布**
+
+```glsl
+// 使用 mod 和 sin 创建伪随机数
+float random(vec2 st) {
+    return fract(sin(dot(st, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
+// 创建网格化随机分布
+vec2 gridPos = floor(uv * 10.0);  // 分成10x10网格
+float rand = random(gridPos);     // 每个网格有自己的随机值
+```
+
+#### 3. **限制顶点动画范围**
+
+```glsl
+// 顶点着色器中限制位移范围
+void main() {
+    vec3 pos = position;
+    
+    // 在x方向创建波浪效果，但限制在 [-1, 1] 范围内
+    pos.x += sin(time + pos.y) * amplitude;
+    pos.x = mod(pos.x + 1.0, 2.0) - 1.0;  // 映射到 [-1, 1)
+    
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+}
+```
+
+
+
+### 性能注意事项
+
+1. **`mod` 比 `fract` 慢**：如果只是需要取小数部分，使用 `fract(x)` 而不是 `mod(x, 1.0)`
+2. **避免在循环中大量使用**：特别是在片段着色器中，每个像素都会计算
+3. **考虑使用 `step` 或 `smoothstep`**：对于某些模式，可以用条件判断替代 `mod`
+
+### 常见错误
+
+```glsl
+// 错误：除数为0
+float a = mod(x, 0.0);  // 未定义行为，可能导致NaN或inf
+
+// 正确做法：添加保护
+float safeMod(float x, float y) {
+    return y == 0.0 ? x : mod(x, y);
+}
+```
+
+`mod` 是 GLSL 中非常实用的函数，特别适合创建重复图案、周期效果和各种网格化视觉效果。
 
 ------
+
+
 
 ## Pattern 28这两种区别在哪里，为什么使用length是减呢，不应该是加吗
 

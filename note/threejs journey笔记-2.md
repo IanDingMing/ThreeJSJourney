@@ -2319,8 +2319,6 @@ if(normalLength < 0.9 || normalLength > 1.1) {
 
 ## P39
 
-
-
 # 附录
 
 ## "色调映射在LDR设备上呈现HDR内容"的理解

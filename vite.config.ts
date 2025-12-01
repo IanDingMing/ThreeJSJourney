@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import path from 'path'
 import vue from '@vitejs/plugin-vue'
+import glsl from 'vite-plugin-glsl';
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -8,7 +9,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: isProduction ? '/ThreeJSJourney/' : '/',
-    plugins: [vue()],
+    plugins: [vue(), glsl()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),

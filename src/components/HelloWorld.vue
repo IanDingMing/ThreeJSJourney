@@ -21,8 +21,8 @@ import { getTextureUrl } from "@/utils/texturesUtils";
 // 导入RectAreaLightHelper
 import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
 import * as CANNON from "cannon-es";
-import waterVertexShader from "@/shaders/water2/vertex.glsl?raw";
-import waterFragmentShader from "@/shaders/water2/fragment.glsl?raw";
+import halftoneVertexShader from "@/shaders/halftone/vertex.glsl";
+import halftoneFragmentShader from "@/shaders/halftone/fragment.glsl";
 
 const sizes = {
   width: 800,
@@ -73,6 +73,15 @@ const handleDoubleClick = () => {
   }
 };
 
+/**
+ * 模型加载
+ */
+// 1. 初始化加载器
+const gltfLoader = new GLTFLoader();
+
+// 2. 定义模型路径（支持 gltf/glb 等格式）
+const modelPath = `${import.meta.env.BASE_URL}models/suzanne.glb`; // 文件路径：/public/models/Duck
+
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
@@ -83,47 +92,62 @@ onMounted(() => {
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 模型mesh==========================
-
   /**
-   * Water
+   * Material
    */
-  // Geometry
-  const waterGeometry = new THREE.PlaneGeometry(2, 2, 512, 512);
-  waterGeometry.deleteAttribute("normal");
-  waterGeometry.deleteAttribute("uv");
+  const materialParameters = { color: "#ff794d", shadeColor: "#000000" };
 
-  // Color
-  const debugObject = {
-    depthColor: "#ff4000",
-    sufaceColor: "#151c37",
-  };
-
-  // Material
-  const waterMaterial = new THREE.ShaderMaterial({
-    vertexShader: waterVertexShader,
-    fragmentShader: waterFragmentShader,
+  const material = new THREE.ShaderMaterial({
+    vertexShader: halftoneVertexShader,
+    fragmentShader: halftoneFragmentShader,
     uniforms: {
-      uTime: { value: 0 },
-      uBigWavesElevation: { value: 0.2 },
-      uBigWavesFrenquency: { value: new THREE.Vector2(4, 1.5) },
-      uBigWavesSpeed: { value: 0.75 },
-
-      uSmallWavesElevation: { value: 0.15 },
-      uSmallWavesFrequency: { value: 3 },
-      uSmallWavesSpeed: { value: 0.2 },
-      uSmallIterations: { value: 4 },
-
-      uDepthColor: { value: new THREE.Color(debugObject.depthColor) },
-      uSufaceColor: { value: new THREE.Color(debugObject.sufaceColor) },
-      uColorOffset: { value: 0.925 },
-      uColorMultiplier: { value: 1 },
+      uColor: new THREE.Uniform(new THREE.Color(materialParameters.color)),
+      uShadeColor: new THREE.Uniform(
+        new THREE.Color(materialParameters.shadeColor)
+      ),
     },
   });
 
-  // Mesh
-  const water = new THREE.Mesh(waterGeometry, waterMaterial);
-  water.rotation.x = -Math.PI * 0.5;
-  scene.add(water);
+  /**
+   * Objects
+   */
+  // Torus knot
+  const torusKnot = new THREE.Mesh(
+    new THREE.TorusKnotGeometry(0.6, 0.25, 128, 32),
+    material
+  );
+  torusKnot.position.x = 3;
+  scene.add(torusKnot);
+
+  // Sphere
+  const sphere = new THREE.Mesh(new THREE.SphereGeometry(), material);
+  sphere.position.x = -3;
+  scene.add(sphere);
+
+  // Suzanne
+  let suzanne: THREE.Group | null = null;
+  // 3. 执行加载
+  gltfLoader.load(
+    modelPath,
+    // 加载成功回调
+    (gltf) => {
+      suzanne = gltf.scene;
+      suzanne.traverse((child) => {
+        if (child.isMesh) child.material = material;
+      });
+
+      // 关键：添加整个模型场景（含完整层级，避免漏元素）
+      scene!.add(gltf.scene);
+    },
+    // 加载进度回调
+    (xhr) => {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
+    // 加载错误回调
+    (error) => {
+      console.error("加载失败：", error);
+    }
+  );
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -135,12 +159,14 @@ onMounted(() => {
    */
   // Base camera
   const camera = new THREE.PerspectiveCamera(
-    75,
+    25,
     sizes.width / sizes.height,
     0.1,
     100
   );
-  camera.position.set(1, 1, 1);
+  camera.position.x = 7;
+  camera.position.y = 7;
+  camera.position.z = 7;
   scene.add(camera);
 
   // Controls
@@ -148,11 +174,11 @@ onMounted(() => {
   controls.enableDamping = true;
 
   // 创建渲染器对象
+  const rendererParameters = { clearColor: "#26132f" };
   renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  // renderer.setClearColor(new THREE.Color("#262837")); //设置渲染器的背景颜色
+  renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
 
   webgl.value!.appendChild(renderer.domElement);
 
@@ -163,8 +189,17 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
-    // Update water
-    waterMaterial.uniforms.uTime.value = elapsedTime;
+    // Rotate objects
+    if (suzanne) {
+      suzanne.rotation.x = -elapsedTime * 0.1;
+      suzanne.rotation.y = elapsedTime * 0.2;
+    }
+
+    sphere.rotation.x = -elapsedTime * 0.1;
+    sphere.rotation.y = elapsedTime * 0.2;
+
+    torusKnot.rotation.x = -elapsedTime * 0.1;
+    torusKnot.rotation.y = elapsedTime * 0.2;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -183,50 +218,13 @@ onMounted(() => {
   // 创建GUI===================
   gui = new GUI();
 
-  gui
-    .add(waterMaterial.uniforms.uBigWavesElevation, "value", 0, 1, 0.001)
-    .name("uBigWavesElevation");
-  gui
-    .add(waterMaterial.uniforms.uBigWavesFrenquency.value, "x", 0, 10, 0.001)
-    .name("uBigWavesFrenquencyX");
-  gui
-    .add(waterMaterial.uniforms.uBigWavesFrenquency.value, "y", 0, 10, 0.001)
-    .name("uBigWavesFrenquencyY");
-  gui
-    .add(waterMaterial.uniforms.uBigWavesSpeed, "value", 0, 4, 0.001)
-    .name("uBigWavesSpeed");
+  gui.addColor(rendererParameters, "clearColor").onChange(() => {
+    renderer!.setClearColor(rendererParameters.clearColor);
+  });
+  gui.addColor(materialParameters, "color").onChange(() => {
+    material.uniforms.uColor.value.set(materialParameters.color);
+  });
 
-  gui
-    .add(waterMaterial.uniforms.uSmallWavesElevation, "value", 0, 1, 0.001)
-    .name("uSmallWavesElevation");
-  gui
-    .add(waterMaterial.uniforms.uSmallWavesFrequency, "value", 0, 30, 0.001)
-    .name("uSmallWavesFrequency");
-  gui
-    .add(waterMaterial.uniforms.uSmallWavesSpeed, "value", 0, 4, 0.001)
-    .name("uSmallWavesSpeed");
-  gui
-    .add(waterMaterial.uniforms.uSmallIterations, "value", 0, 5, 1)
-    .name("uSmallIterations");
-
-  gui
-    .addColor(debugObject, "depthColor")
-    .name("depthColor")
-    .onChange(() => {
-      waterMaterial.uniforms.uDepthColor.value.set(debugObject.depthColor);
-    });
-  gui
-    .addColor(debugObject, "sufaceColor")
-    .name("sufaceColor")
-    .onChange(() => {
-      waterMaterial.uniforms.uSufaceColor.value.set(debugObject.sufaceColor);
-    });
-  gui
-    .add(waterMaterial.uniforms.uColorOffset, "value", 0, 1, 0.001)
-    .name("uColorOffset");
-  gui
-    .add(waterMaterial.uniforms.uColorMultiplier, "value", 0, 10, 0.001)
-    .name("uColorMultiplier");
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

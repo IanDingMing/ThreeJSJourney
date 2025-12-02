@@ -21,8 +21,8 @@ import { getTextureUrl } from "@/utils/texturesUtils";
 // 导入RectAreaLightHelper
 import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
 import * as CANNON from "cannon-es";
-import halftoneVertexShader from "@/shaders/halftone/vertex.glsl";
-import halftoneFragmentShader from "@/shaders/halftone/fragment.glsl";
+import earthVertexShader from "@/shaders/earth/vertex.glsl";
+import earthFragmentShader from "@/shaders/earth/fragment.glsl";
 
 const sizes = {
   width: 800,
@@ -104,71 +104,17 @@ onMounted(() => {
 
   // 模型mesh==========================
   /**
-   * Material
+   * Earth
    */
-  const materialParameters = {
-    color: "#ff794d",
-    shadowColor: "#8e19b8",
-    lightColor: "#e5ff30",
-  };
-
-  const material = new THREE.ShaderMaterial({
-    vertexShader: halftoneVertexShader,
-    fragmentShader: halftoneFragmentShader,
-    uniforms: {
-      uColor: new THREE.Uniform(new THREE.Color(materialParameters.color)),
-      uResolution: new THREE.Uniform(sizes.resolution),
-      uShadowRepetitions: new THREE.Uniform(100),
-      uShadowColor: new THREE.Uniform(
-        new THREE.Color(materialParameters.shadowColor)
-      ),
-      uLightRepetitions: new THREE.Uniform(130),
-      uLightColor: new THREE.Uniform(
-        new THREE.Color(materialParameters.lightColor)
-      ),
-    },
+  // Mesh
+  const earthGeometry = new THREE.SphereGeometry(2, 64, 64);
+  const earthMaterial = new THREE.ShaderMaterial({
+    vertexShader: earthVertexShader,
+    fragmentShader: earthFragmentShader,
+    uniforms: {},
   });
-
-  /**
-   * Objects
-   */
-  // Torus knot
-  const torusKnot = new THREE.Mesh(
-    new THREE.TorusKnotGeometry(0.6, 0.25, 128, 32),
-    material
-  );
-  torusKnot.position.x = 3;
-  scene.add(torusKnot);
-
-  // Sphere
-  const sphere = new THREE.Mesh(new THREE.SphereGeometry(), material);
-  sphere.position.x = -3;
-  scene.add(sphere);
-
-  // Suzanne
-  let suzanne: THREE.Group | null = null;
-  // 3. 执行加载
-  gltfLoader.load(
-    modelPath,
-    // 加载成功回调
-    (gltf) => {
-      suzanne = gltf.scene;
-      suzanne.traverse((child) => {
-        if (child.isMesh) child.material = material;
-      });
-
-      // 关键：添加整个模型场景（含完整层级，避免漏元素）
-      scene!.add(gltf.scene);
-    },
-    // 加载进度回调
-    (xhr) => {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    // 加载错误回调
-    (error) => {
-      console.error("加载失败：", error);
-    }
-  );
+  const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+  scene.add(earth);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(); //创建一个坐标轴辅助对象
@@ -185,9 +131,9 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.x = 7;
-  camera.position.y = 7;
-  camera.position.z = 7;
+  camera.position.x = 12;
+  camera.position.y = 5;
+  camera.position.z = 4;
   scene.add(camera);
 
   // Controls
@@ -195,7 +141,7 @@ onMounted(() => {
   controls.enableDamping = true;
 
   // 创建渲染器对象
-  const rendererParameters = { clearColor: "#26132f" };
+  const rendererParameters = { clearColor: "#000011" };
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(sizes.pixelRatio);
@@ -210,17 +156,7 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
-    // Rotate objects
-    if (suzanne) {
-      suzanne.rotation.x = -elapsedTime * 0.1;
-      suzanne.rotation.y = elapsedTime * 0.2;
-    }
-
-    sphere.rotation.x = -elapsedTime * 0.1;
-    sphere.rotation.y = elapsedTime * 0.2;
-
-    torusKnot.rotation.x = -elapsedTime * 0.1;
-    torusKnot.rotation.y = elapsedTime * 0.2;
+    earth.rotation.y = elapsedTime * 0.1;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -239,20 +175,6 @@ onMounted(() => {
   // 创建GUI===================
   gui = new GUI();
 
-  gui.addColor(rendererParameters, "clearColor").onChange(() => {
-    renderer!.setClearColor(rendererParameters.clearColor);
-  });
-  gui.addColor(materialParameters, "color").onChange(() => {
-    material.uniforms.uColor.value.set(materialParameters.color);
-  });
-  gui.add(material.uniforms.uShadowRepetitions, "value", 1, 300, 1);
-  gui.addColor(materialParameters, "shadowColor").onChange(() => {
-    material.uniforms.uShadowColor.value.set(materialParameters.shadowColor);
-  });
-  gui.add(material.uniforms.uLightRepetitions, "value", 1, 300, 1);
-  gui.addColor(materialParameters, "lightColor").onChange(() => {
-    material.uniforms.uLightColor.value.set(materialParameters.lightColor);
-  });
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

@@ -21,13 +21,8 @@ import { getTextureUrl } from "@/utils/texturesUtils";
 // 导入RectAreaLightHelper
 import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
 import * as CANNON from "cannon-es";
-import earthVertexShader from "@/shaders/earth/vertex.glsl";
-import earthFragmentShader from "@/shaders/earth/fragment.glsl";
-import earthDayPath from "@/assets/textures/earth/day.jpg";
-import earthNightPath from "@/assets/textures/earth/night.jpg";
-import earthSpecularCloudsPath from "@/assets/textures/earth/specularClouds.jpg";
-import atmosphereVertexShader from "@/shaders/atmosphere/vertex.glsl";
-import atmosphereFragmentShader from "@/shaders/atmosphere/fragment.glsl";
+import particlesVertexShader from "@/shaders/particles/vertex.glsl";
+import particlesFragmentShader from "@/shaders/particles/fragment.glsl";
 
 const sizes = {
   width: 800,
@@ -108,15 +103,6 @@ loadingManager.onError = (url) => {
 
 const texturesLoader = new THREE.TextureLoader(loadingManager);
 
-/**
- * 模型加载
- */
-// 1. 初始化加载器
-const gltfLoader = new GLTFLoader();
-
-// 2. 定义模型路径（支持 gltf/glb 等格式）
-const modelPath = `${import.meta.env.BASE_URL}models/suzanne.glb`; // 文件路径：/public/models/Duck
-
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
@@ -128,94 +114,24 @@ onMounted(() => {
 
   // 模型mesh==========================
   /**
-   * Earth
+   * Particles
    */
-  const earthParameters = {
-    atmosphereDayColor: "#00aaff",
-    atmosphereTwilightColor: "#ff6600",
-  };
+  const particlesGeometry = new THREE.PlaneGeometry(10, 10, 32, 32);
 
-  // Textures
-  const earthDayTexture = texturesLoader.load(earthDayPath);
-  earthDayTexture.colorSpace = THREE.SRGBColorSpace;
-  earthDayTexture.anisotropy = 8;
-
-  const earthNightTexture = texturesLoader.load(earthNightPath);
-  earthNightTexture.colorSpace = THREE.SRGBColorSpace;
-  earthNightTexture.anisotropy = 8;
-
-  const earthSpecularCloudsTexture = texturesLoader.load(
-    earthSpecularCloudsPath
-  );
-  earthSpecularCloudsTexture.anisotropy = 8;
-
-  // Mesh
-  const earthGeometry = new THREE.SphereGeometry(2, 64, 64);
-  const earthMaterial = new THREE.ShaderMaterial({
-    vertexShader: earthVertexShader,
-    fragmentShader: earthFragmentShader,
+  const particlesMaterial = new THREE.ShaderMaterial({
+    vertexShader: particlesVertexShader,
+    fragmentShader: particlesFragmentShader,
     uniforms: {
-      uDayTexture: new THREE.Uniform(earthDayTexture),
-      uNightTexture: new THREE.Uniform(earthNightTexture),
-      uSpecularCloudsTexture: new THREE.Uniform(earthSpecularCloudsTexture),
-      uSunDirection: new THREE.Uniform(new THREE.Vector3(0, 0, 1)),
-      uAtmosphereDayColor: new THREE.Uniform(
-        new THREE.Color(earthParameters.atmosphereDayColor)
-      ),
-      uAtmosphereTwilightColor: new THREE.Uniform(
-        new THREE.Color(earthParameters.atmosphereTwilightColor)
+      uResolution: new THREE.Uniform(
+        new THREE.Vector2(
+          sizes.width * sizes.pixelRatio,
+          sizes.height * sizes.pixelRatio
+        )
       ),
     },
   });
-  const earth = new THREE.Mesh(earthGeometry, earthMaterial);
-  scene.add(earth);
-
-  // Atmosphere
-  const atmosphereMaterial = new THREE.ShaderMaterial({
-    vertexShader: atmosphereVertexShader,
-    fragmentShader: atmosphereFragmentShader,
-    uniforms: {
-      uSunDirection: new THREE.Uniform(new THREE.Vector3(0, 0, 1)),
-      uAtmosphereDayColor: new THREE.Uniform(
-        new THREE.Color(earthParameters.atmosphereDayColor)
-      ),
-      uAtmosphereTwilightColor: new THREE.Uniform(
-        new THREE.Color(earthParameters.atmosphereTwilightColor)
-      ),
-    },
-    side: THREE.BackSide,
-    transparent: true,
-  });
-  const atmosphere = new THREE.Mesh(earthGeometry, atmosphereMaterial);
-  atmosphere.scale.set(1.04, 1.04, 1.04);
-  scene.add(atmosphere);
-
-  /**
-   * Sun
-   */
-  const sunSpherical = new THREE.Spherical(1, Math.PI * 0.5, 0.5);
-  const sunDirection = new THREE.Vector3();
-
-  // Debug
-  const debugSun = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(0.1, 2),
-    new THREE.MeshBasicMaterial()
-  );
-  scene.add(debugSun);
-
-  // Update
-  const updateSun = () => {
-    // Sun direction
-    sunDirection.setFromSpherical(sunSpherical);
-
-    // Debug
-    debugSun.position.copy(sunDirection).multiplyScalar(5);
-
-    // Uniforms
-    earthMaterial.uniforms.uSunDirection.value.copy(sunDirection);
-    atmosphereMaterial.uniforms.uSunDirection.value.copy(sunDirection);
-  };
-  updateSun();
+  const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+  scene.add(particles);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(5); //创建一个坐标轴辅助对象
@@ -226,14 +142,12 @@ onMounted(() => {
    */
   // Base camera
   camera = new THREE.PerspectiveCamera(
-    25,
+    35,
     sizes.width / sizes.height,
     0.1,
     100
   );
-  camera.position.x = 12;
-  camera.position.y = 5;
-  camera.position.z = 4;
+  camera.position.set(0, 0, 18);
   scene.add(camera);
 
   // Controls
@@ -241,7 +155,7 @@ onMounted(() => {
   controls.enableDamping = true;
 
   // 创建渲染器对象
-  const rendererParameters = { clearColor: "#000011" };
+  const rendererParameters = { clearColor: "#181818" };
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(sizes.pixelRatio);
@@ -255,8 +169,6 @@ onMounted(() => {
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
-
-    earth.rotation.y = elapsedTime * 0.1;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -274,26 +186,7 @@ onMounted(() => {
 
   // 创建GUI===================
   gui = new GUI();
-  // Tweaks
-  gui.add(sunSpherical, "phi").min(0).max(Math.PI).onChange(updateSun);
 
-  gui.add(sunSpherical, "theta").min(-Math.PI).max(Math.PI).onChange(updateSun);
-  gui.addColor(earthParameters, "atmosphereDayColor").onChange(() => {
-    earthMaterial.uniforms.uAtmosphereDayColor.value.set(
-      earthParameters.atmosphereDayColor
-    );
-    atmosphereMaterial.uniforms.uAtmosphereDayColor.value.set(
-      earthParameters.atmosphereDayColor
-    );
-  });
-  gui.addColor(earthParameters, "atmosphereTwilightColor").onChange(() => {
-    earthMaterial.uniforms.uAtmosphereTwilightColor.value.set(
-      earthParameters.atmosphereTwilightColor
-    );
-    atmosphereMaterial.uniforms.uAtmosphereTwilightColor.value.set(
-      earthParameters.atmosphereTwilightColor
-    );
-  });
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

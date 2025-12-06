@@ -2672,6 +2672,678 @@ side: THREE.BackSide
 
 
 
+## P41 Particles Cursor Animation Shader
+
+### 一、`discard` 关键字详解
+
+#### 1. 什么是 `discard`？
+
+- `discard` 是中的关键字，用于在片段着色器中**立即丢弃当前像素**
+- 当调用 `discard` 时，该片段**不会写入颜色缓冲区、深度缓冲区或模板缓冲区**
+- 相当于让这个像素"消失"，完全不渲染
+
+#### 2. 使用场景
+
+```glsl
+// 示例：绘制圆形点精灵
+varying vec3 vColor;
+
+void main() {
+    vec2 uv = gl_PointCoord;
+    float distanceToCenter = length(uv - vec2(.5));
+    
+    // 场景1：绘制圆形（丢弃方形角落）
+    if(distanceToCenter > .5) {
+        discard;  // 丢弃非圆形区域的像素
+    }
+    
+    // 场景2：基于alpha的裁剪
+    float alpha = texture(uTexture, uv).a;
+    if(alpha < 0.1) {
+        discard;  // 丢弃透明像素
+    }
+    
+    // 场景3：基于深度的裁剪
+    if(gl_FragCoord.z > maxDepth) {
+        discard;  // 丢弃超出深度的像素
+    }
+    
+    gl_FragColor = vec4(vColor, 1.0);
+}
+```
+
+#### 3. 性能影响
+
+##### ✅ 优点：
+
+- **减少过度绘制**：提前终止不需要的片段处理
+- **节省带宽**：减少不必要的帧缓冲写入
+
+##### ⚠️ 性能问题：
+
+1. **破坏早期深度测试**：
+
+   ```javascript
+   // 问题：现代GPU的优化流程
+   // 1. 早期深度测试（Early Z）-> 深度测试先于片段着色器执行
+   // 2. 使用discard后，GPU无法提前进行深度测试
+   // 3. 导致更多片段需要执行完整的着色器计算
+   ```
+
+2. **分支预测失效**：
+
+   - GPU并行处理多个片段（如32个一组）
+   - 如果组内有的片段discard，有的不discard，组内所有片段都需要执行完整代码
+
+3. **内存访问模式变差**：
+
+   - 不连贯的内存访问可能导致缓存未命中
+
+#### 4. 最佳实践
+
+```javascript
+// 替代方案1：使用alpha测试（某些平台有硬件支持）
+material.alphaTest = 0.5;
+
+// 替代方案2：使用深度预渲染（Depth Prepass）
+// 第一步：只写入深度
+// 第二步：渲染颜色（自动通过深度测试的片段）
+
+// 替代方案3：合理的LOD和剔除
+// 在几何阶段就剔除不需要的物体
+```
+
+#### 5. 何时使用 `discard`
+
+```javascript
+// ✅ 适合使用的情况：
+// 1. 像素级裁剪（如本例的圆形点）
+// 2. 需要完全透明（不是半透明混合）
+// 3. 被丢弃的像素比例很高（>30%）
+// 4. 简单条件判断（避免复杂分支）
+
+// ❌ 避免使用的情况：
+// 1. 需要半透明混合（使用alpha blending）
+// 2. 大部分像素都需要渲染
+// 3. 复杂的逐像素条件判断
+```
+
+
+
+### 二、HTML5 Canvas Cheat Sheet 链接作用
+
+这是一个HTML5 Canvas API的速查表，包含：
+
+- Canvas 2D上下文的所有方法和属性
+- 绘制形状、文本、图像的API
+- 变换、合成、样式设置
+- 动画和交互处理
+
+在你的代码中，用于创建2D位移贴图：
+
+```javascript
+// 创建Canvas元素
+displacement.canvas = document.createElement("canvas");
+displacement.canvas.width = 128;
+displacement.canvas.height = 128;
+
+// 获取2D上下文（这就是Canvas API的核心）
+displacement.context = displacement.canvas.getContext("2d");
+
+// 使用Canvas API绘制
+displacement.context.fillRect(0, 0, displacement.canvas.width, displacement.canvas.height);
+```
+
+
+
+### 三、Canvas操作详细解释
+
+#### 1. Canvas基础概念
+
+```javascript
+// Canvas是一个画布，提供2D绘图API
+const canvas = document.createElement("canvas");
+const ctx = canvas.getContext("2d");  // 获取2D上下文
+
+// 坐标系：左上角(0,0)，右下角(width,height)
+// 单位：像素
+```
+
+#### 2. 你的代码中Canvas操作解析
+
+```javascript
+// 1. 创建Canvas元素
+displacement.canvas = document.createElement("canvas");
+displacement.canvas.width = 128;   // 设置画布宽度（像素）
+displacement.canvas.height = 128;  // 设置画布高度（像素）
+
+// 2. 获取2D上下文
+displacement.context = displacement.canvas.getContext("2d");
+
+// 3. 填充整个画布
+displacement.context.fillRect(0, 0, displacement.canvas.width, displacement.canvas.height);
+// fillRect(x, y, width, height) - 绘制填充矩形
+
+// 4. 设置混合模式
+displacement.context.globalCompositeOperation = "source-over";
+// 合成操作类型：
+// - 'source-over': 默认，新图像绘制在旧图像之上
+// - 'lighten': 取两者中较亮的颜色
+// - 'multiply': 颜色相乘
+// - 等等...
+
+// 5. 设置全局透明度
+displacement.context.globalAlpha = 0.02;
+// 影响后续所有绘制操作的透明度
+
+// 6. 绘制图像
+displacement.context.drawImage(
+    displacement.glowImage,        // 源图像
+    displacement.canvasCursor.x - glowSize * 0.5,  // 目标x坐标
+    displacement.canvasCursor.y - glowSize * 0.5,  // 目标y坐标
+    glowSize,                      // 目标宽度
+    glowSize                       // 目标高度
+);
+```
+
+#### 3. 具体流程解析
+
+```javascript
+// 每帧执行的Canvas操作：
+function updateCanvas() {
+    // 步骤1：淡出效果（模拟残影）
+    // 用带透明度的黑色覆盖整个画布，让之前的内容逐渐消失
+    displacement.context.globalCompositeOperation = "source-over";
+    displacement.context.globalAlpha = 0.02;  // 2%透明度
+    displacement.context.fillRect(0, 0, displacement.canvas.width, displacement.canvas.height);
+    
+    // 步骤2：绘制光晕
+    // 根据鼠标移动速度计算光晕强度
+    const cursorDistance = displacement.canvasCursorPrevious.distanceTo(
+        displacement.canvasCursor
+    );
+    const alpha = Math.min(cursorDistance * 0.1, 1);  // 速度越快，光晕越亮
+    
+    displacement.context.globalCompositeOperation = "lighten";  // 变亮混合模式
+    displacement.context.globalAlpha = alpha;  // 动态透明度
+    
+    // 在光标位置绘制光晕图像
+    displacement.context.drawImage(
+        displacement.glowImage,
+        x - size/2, y - size/2,  // 居中绘制
+        size, size
+    );
+}
+```
+
+#### 4. Canvas作为Three.js纹理
+
+```javascript
+// 将Canvas转换为Three.js纹理
+displacement.texture = new THREE.CanvasTexture(displacement.canvas);
+
+// 在着色器中使用
+uniform sampler2D uDisplacementTexture;
+
+// 重要：需要手动更新纹理
+displacement.texture.needsUpdate = true;
+```
+
+
+
+### 四、`particlesGeometry.setIndex(null)` 详解
+
+#### 1. Three.js几何体索引系统
+
+```javascript
+// Three.js默认使用索引化几何体
+// 顶点数据共享，通过索引引用
+
+// 示例：一个矩形（2个三角形）使用索引
+const vertices = [
+    // 4个顶点
+    [0,0,0], [1,0,0], [1,1,0], [0,1,0]
+];
+const indices = [
+    0,1,2,  // 第一个三角形
+    0,2,3   // 第二个三角形
+];
+// 总共：4个顶点，6个索引（2个三角形）
+```
+
+#### 2. 为什么要设置 `setIndex(null)`？
+
+```javascript
+// 对于粒子系统，每个粒子应该是独立的点
+const particlesGeometry = new THREE.PlaneGeometry(10, 10, 128, 128);
+
+// 默认情况：平面几何体使用索引优化
+// 顶点数：129×129 = 16641个顶点
+// 索引数：128×128×6 = 98304个索引（用于组成三角形）
+
+// 设置null后：
+particlesGeometry.setIndex(null);
+// 效果：几何体变成"非索引"的
+// 每个三角形单独存储顶点数据
+// 顶点数据会重复，但每个顶点可以独立处理
+```
+
+#### 3. 为什么会"点多出来"？
+
+```javascript
+// 原因1：索引化的几何体会复用顶点
+// 例如：一个顶点被多个三角形共享
+// 在粒子系统中，这会导致多个粒子共享同一位置
+
+// 原因2：Three.Points 使用顶点作为粒子位置
+// 非索引几何体：每个三角形有自己的3个顶点
+// 对于128×128细分平面：
+// - 索引化：16641个顶点
+// - 非索引：98304个顶点（128×128×6）
+// 粒子数量大大增加！
+
+// 原因3：几何体属性需要与顶点数匹配
+// 设置自定义属性（如aIntensity）时，需要为每个顶点提供值
+// 非索引化确保每个粒子有独立的属性值
+```
+
+#### 4. 验证代码
+
+```javascript
+const geometry = new THREE.PlaneGeometry(1, 1, 2, 2);
+console.log('顶点数:', geometry.attributes.position.count);  // 9
+console.log('索引数:', geometry.index.count);               // 24
+
+geometry.setIndex(null);
+console.log('设置null后顶点数:', geometry.attributes.position.count);  // 24
+// 注意：实际位置数据还是9个，但Three.js会复制数据
+```
+
+
+
+### 五、完整代码流程梳理
+
+#### 1. 项目结构
+
+```text
+粒子光标动画效果
+├── 2D Canvas层 (光晕绘制)
+├── 3D粒子层 (Three.js粒子系统)
+└── 交互层 (鼠标跟踪)
+```
+
+#### 2. 核心流程
+
+```javascript
+// 步骤1：初始化
+1. 创建2D Canvas用于绘制光晕
+2. 创建Three.js粒子几何体（非索引化）
+3. 加载图片纹理和创建着色器材质
+4. 设置相机和渲染器
+
+// 步骤2：交互处理
+1. 监听鼠标移动，计算归一化屏幕坐标(-1到1)
+2. 使用Raycaster将屏幕坐标转换为3D坐标
+3. 将3D坐标映射到2D Canvas坐标
+
+// 步骤3：渲染循环
+1. 更新2D Canvas：淡出旧痕迹 + 绘制新光晕
+2. 更新粒子着色器：使用Canvas纹理作为位移贴图
+3. 渲染Three.js场景
+```
+
+#### 3. 着色器工作流程
+
+```glsl
+// 顶点着色器
+1. 从位移纹理获取当前UV位置的强度
+2. 根据强度计算位移偏移
+3. 应用位移到顶点位置
+4. 计算粒子大小（基于图片纹理强度）
+
+// 片段着色器
+1. 获取点在精灵坐标系中的位置(gl_PointCoord)
+2. 计算到中心的距离
+3. 使用discard丢弃非圆形区域的像素
+4. 输出颜色
+```
+
+
+
+### 六、Canvas淡出效果实现机制
+
+#### 1. 不是"清空画布"，而是"渐进覆盖"
+
+```javascript
+// 你的代码片段
+displacement.context.globalCompositeOperation = "source-over";
+displacement.context.globalAlpha = 0.02;
+displacement.context.fillRect(0, 0, displacement.canvas.width, displacement.canvas.height);
+```
+
+#### 2. 详细分解
+
+```javascript
+// 模拟每一帧的过程：
+let canvasContent = []; // 想象这是一个像素数组
+
+// 第一帧：绘制光晕
+canvasContent = [亮色, 亮色, 亮色, 亮色, ...];
+
+// 第二帧：淡出覆盖
+// 1. 设置混合模式为"覆盖"
+displacement.context.globalCompositeOperation = "source-over";
+
+// 2. 设置透明度为2%
+displacement.context.globalAlpha = 0.02;
+
+// 3. 用黑色覆盖整个画布
+// 效果：每个像素 = 原像素 × 0.98 + 黑色 × 0.02
+// 黑色是 [0,0,0]，所以结果 = 原像素 × 0.98
+canvasContent = [稍暗色, 稍暗色, 稍暗色, 稍暗色, ...];
+
+// 第三帧：再次覆盖
+canvasContent = [更暗色, 更暗色, 更暗色, 更暗色, ...];
+
+// 随着时间的推移，所有像素都逐渐接近黑色
+```
+
+#### 3. 数学原理
+
+```javascript
+// Canvas的颜色混合公式：
+// 结果颜色 = (原颜色 × (1 - alpha)) + (新颜色 × alpha)
+
+// 假设原像素是白色 [255, 255, 255]，alpha=0.02
+// 新颜色是黑色 [0, 0, 0]
+// 计算结果：
+// R = 255 * (1-0.02) + 0 * 0.02 = 255 * 0.98 = 249.9 ≈ 250
+// G = 255 * 0.98 = 250
+// B = 255 * 0.98 = 250
+
+// 每次覆盖都会让颜色值乘以0.98
+// 经过n帧后：颜色值 = 原始值 × (0.98)^n
+// 所以亮度呈指数衰减
+```
+
+#### 4. 可视化演示
+
+```text
+时间轴：每一帧都执行一次淡出覆盖
+
+第0帧：██████ 原始光晕（很亮）
+        ^
+        | 黑色覆盖(2%透明度)
+第1帧：▆▆▆▆▆▆ 亮度降到98%
+        ^
+        | 再次覆盖
+第2帧：▅▅▅▅▅▅ 亮度降到96.04% (0.98×0.98)
+        ^
+        | 持续覆盖
+第10帧：▁▁▁▁▁▁ 亮度降到81.7% (0.98^10)
+        ^
+        | ...
+第50帧：     亮度降到36.4% (0.98^50)
+```
+
+
+
+### 七、光晕效果实现详解
+
+#### 1. 完整光晕绘制代码
+
+```javascript
+// 1. 设置变亮混合模式
+displacement.context.globalCompositeOperation = "lighten";
+
+// 2. 根据鼠标速度计算透明度
+const cursorDistance = displacement.canvasCursorPrevious.distanceTo(
+    displacement.canvasCursor
+);
+const alpha = Math.min(cursorDistance * 0.1, 1);
+
+// 3. 设置透明度
+displacement.context.globalAlpha = alpha;
+
+// 4. 绘制光晕图片
+const glowSize = displacement.canvas.width * 0.25;
+displacement.context.drawImage(
+    displacement.glowImage,                    // 光晕图片
+    displacement.canvasCursor.x - glowSize * 0.5,  // x坐标（居中）
+    displacement.canvasCursor.y - glowSize * 0.5,  // y坐标（居中）
+    glowSize,                                // 宽度
+    glowSize                                 // 高度
+);
+```
+
+#### 2. 关键点解析
+
+##### 点1：混合模式 `"lighten"`
+
+```javascript
+// "lighten" 模式：取两个颜色中较亮的那个
+// 公式：结果颜色 = max(源颜色, 目标颜色)
+
+// 示例1：源颜色=红色(255,0,0)，目标颜色=黑色(0,0,0)
+// 结果 = max([255,0,0], [0,0,0]) = [255,0,0]（红色）
+
+// 示例2：源颜色=灰色(100,100,100)，目标颜色=黑色(0,0,0)
+// 结果 = max([100,100,100], [0,0,0]) = [100,100,100]（灰色）
+
+// 作用：光晕只会"变亮"画布，不会"变暗"
+```
+
+##### 点2：鼠标速度计算透明度
+
+```javascript
+// 计算当前帧和上一帧光标位置的距离
+const cursorDistance = displacement.canvasCursorPrevious.distanceTo(
+    displacement.canvasCursor
+);
+
+// 为什么使用距离？
+// 距离大 → 鼠标移动快 → 光晕应该更明显
+// 距离小 → 鼠标移动慢 → 光晕应该更淡
+// 距离0 → 鼠标静止 → 光晕几乎消失
+
+// 转换公式：alpha = Math.min(距离 * 0.1, 1)
+// *0.1：调节敏感度，值越大，相同距离产生的alpha越大
+// Math.min(..., 1)：限制最大值为1（不透明）
+```
+
+##### 点3：光晕图片绘制
+
+```javascript
+// glowImage是一张中心亮、边缘渐变的圆形图片
+// 类似这样的图片：
+// 中心：白色，不透明
+// 边缘：渐变到透明
+
+// 绘制时居中：
+const glowSize = displacement.canvas.width * 0.25;  // 光晕大小为画布的1/4
+const centerX = displacement.canvasCursor.x - glowSize * 0.5;
+const centerY = displacement.canvasCursor.y - glowSize * 0.5;
+
+// 这样绘制时光晕中心正好在光标位置
+```
+
+
+
+### 八、整体效果如何配合
+
+#### 1. 每帧执行顺序
+
+```javascript
+function updateCanvas() {
+    // 第一步：淡出覆盖（让所有像素变暗2%）
+    // 混合模式：source-over（覆盖）
+    // 透明度：0.02
+    // 效果：整个画布逐渐变暗
+    
+    // 第二步：绘制新光晕
+    // 混合模式：lighten（变亮）
+    // 透明度：根据鼠标速度计算
+    // 效果：在光标位置添加明亮光晕
+    
+    // 第三步：更新纹理，供Three.js使用
+    displacement.texture.needsUpdate = true;
+}
+```
+
+
+
+### 四、完整代码注释版
+
+```javascript
+// 创建Canvas元素
+displacement.canvas = document.createElement("canvas");
+displacement.canvas.width = 128;  // 小尺寸，性能好
+displacement.canvas.height = 128;
+
+// 获取2D上下文
+displacement.context = displacement.canvas.getContext("2d");
+
+// 加载光晕图片（中心亮边缘渐变的圆形图片）
+displacement.glowImage = new Image();
+displacement.glowImage.src = glowPath;
+
+// 初始填充为黑色
+displacement.context.fillRect(0, 0, displacement.canvas.width, displacement.canvas.height);
+
+// 在渲染循环中
+function render() {
+    // ...其他代码...
+    
+    // ============== 淡出效果 ==============
+    // 设置混合模式：新内容覆盖旧内容
+    displacement.context.globalCompositeOperation = "source-over";
+    
+    // 设置透明度：2%，非常低的透明度
+    displacement.context.globalAlpha = 0.02;
+    
+    // 用当前填充色（默认黑色）覆盖整个画布
+    // 由于alpha=0.02，这会让所有现有像素变暗2%
+    displacement.context.fillRect(
+        0, 0, 
+        displacement.canvas.width, 
+        displacement.canvas.height
+    );
+    
+    // ============== 光晕效果 ==============
+    // 计算鼠标移动距离（当前帧与上一帧的距离）
+    const cursorDistance = displacement.canvasCursorPrevious.distanceTo(
+        displacement.canvasCursor
+    );
+    
+    // 保存当前位置，用于下一帧计算
+    displacement.canvasCursorPrevious.copy(displacement.canvasCursor);
+    
+    // 根据移动距离计算光晕透明度
+    // 距离越大（移动越快），alpha越大（光晕越亮）
+    // 限制最大值不超过1
+    const alpha = Math.min(cursorDistance * 0.1, 1);
+    
+    // 设置混合模式：变亮，只增加亮度，不减暗
+    displacement.context.globalCompositeOperation = "lighten";
+    
+    // 设置计算出的透明度
+    displacement.context.globalAlpha = alpha;
+    
+    // 计算光晕大小（画布宽度的1/4）
+    const glowSize = displacement.canvas.width * 0.25;
+    
+    // 在光标位置绘制光晕图片（居中绘制）
+    displacement.context.drawImage(
+        displacement.glowImage,  // 光晕图片
+        displacement.canvasCursor.x - glowSize * 0.5,  // x位置（居中）
+        displacement.canvasCursor.y - glowSize * 0.5,  // y位置（居中）
+        glowSize,  // 宽度
+        glowSize   // 高度
+    );
+    
+    // 告诉Three.js纹理需要更新
+    displacement.texture.needsUpdate = true;
+    
+    // ...继续渲染...
+}
+```
+
+
+
+### 五、调试技巧
+
+如果想看到实际效果，可以添加调试代码：
+
+```javascript
+// 1. 查看Canvas内容
+console.log(displacement.canvas);  // 可以在控制台查看Canvas
+
+// 2. 可视化显示Canvas（在页面中显示）
+displacement.canvas.style.border = "1px solid red";
+displacement.canvas.style.position = "fixed";
+displacement.canvas.style.top = "0";
+displacement.canvas.style.left = "0";
+displacement.canvas.style.zIndex = "1000";
+
+// 3. 打印调试信息
+console.log("光标距离:", cursorDistance);
+console.log("光晕透明度:", alpha);
+console.log("光标位置:", displacement.canvasCursor.x, displacement.canvasCursor.y);
+
+// 4. 修改参数看效果
+// 尝试修改淡出透明度：
+// displacement.context.globalAlpha = 0.1;  // 更快的淡出
+// displacement.context.globalAlpha = 0.005; // 更慢的淡出
+
+// 尝试修改光晕敏感度：
+// const alpha = Math.min(cursorDistance * 0.05, 1);  // 更不敏感
+// const alpha = Math.min(cursorDistance * 0.2, 1);   // 更敏感
+```
+
+
+
+### 六、常见问题解答
+
+**Q：为什么用黑色覆盖，不是其他颜色？**
+A：黑色在"变亮"模式下不会影响亮度，但在"覆盖"模式下会让像素变暗。黑色是[0,0,0]，让像素乘以(1-alpha)后变暗。
+
+**Q：为什么光晕大小是画布的1/4？**
+A：这是经验值。太大可能模糊，太小可能不明显。可以根据需要调整：
+
+```javascript
+// 尝试不同比例
+const glowSize = displacement.canvas.width * 0.15;  // 更小
+const glowSize = displacement.canvas.width * 0.35;  // 更大
+```
+
+**Q：淡出透明度0.02是怎么确定的？**
+A：通过试验得到的平衡值。太小淡出太慢，太大淡出太快：
+
+```javascript
+// 不同效果的尝试：
+// 0.01: 淡出很慢，痕迹持续很久
+// 0.02: 适中，推荐值
+// 0.05: 淡出很快，痕迹很快消失
+// 0.1:  淡出非常快，几乎瞬间消失
+```
+
+**Q：为什么鼠标移动距离要乘以0.1？**
+A：这是缩放因子，将像素距离转换为透明度(0-1)。如果不乘以0.1：
+
+```javascript
+// 假设移动了10像素
+cursorDistance = 10;
+alpha = Math.min(10 * 1, 1) = 1;  // 总是1，没有渐变
+alpha = Math.min(10 * 0.1, 1) = 1;  // 移动10像素就达到最大
+alpha = Math.min(10 * 0.05, 1) = 0.5; // 需要移动20像素才达到最大
+```
+
+
+
+
+
+
+
 # 附录
 
 ## "色调映射在LDR设备上呈现HDR内容"的理解

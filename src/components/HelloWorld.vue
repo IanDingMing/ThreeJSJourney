@@ -23,8 +23,6 @@ import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js
 import * as CANNON from "cannon-es";
 import particlesVertexShader from "@/shaders/particles/vertex.glsl";
 import particlesFragmentShader from "@/shaders/particles/fragment.glsl";
-import picturePath from "@/assets/textures/picture-1.png";
-import glowPath from "@/assets/textures/glow.png";
 
 const sizes = {
   width: 800,
@@ -105,6 +103,15 @@ loadingManager.onError = (url) => {
 
 const texturesLoader = new THREE.TextureLoader(loadingManager);
 
+// 1. 初始化 Draco 解码器
+const dracoLoader = new DRACOLoader();
+// 设置解码器路径（对应 public 下的资源）
+dracoLoader.setDecoderPath(`${import.meta.env.BASE_URL}draco/`); // 文件路径：/public/models/draco
+
+// 2. 关联到 GLTFLoader
+const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
+
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
@@ -115,115 +122,41 @@ onMounted(() => {
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 模型mesh==========================
-  /**
-   * Displacement
-   */
-  const displacement: {
-    canvas: HTMLCanvasElement;
-    context: CanvasRenderingContext2D | null;
-    glowImage: HTMLImageElement;
-  } = {
-    canvas: document.createElement("canvas"),
-    context: null,
-    glowImage: new Image(),
-  };
+  // // 3. 加载 Draco 压缩模型（路径指向 glTF-Draco 格式文件）
+  // gltfLoader.load(
+  //   `${import.meta.env.BASE_URL}models/模型名/glTF-Draco/模型名.gltf`,
+  //   (gltf) => {
+  //     scene.add(gltf.scene);
+  //   }
+  //   // 进度/错误回调同上
+  // );
 
-  // 2D canvas
-  displacement.canvas.width = 128;
-  displacement.canvas.height = 128;
-  displacement.canvas.style.position = "fixed";
-  displacement.canvas.style.width = "256px";
-  displacement.canvas.style.height = "256px";
-  displacement.canvas.style.top = "0";
-  displacement.canvas.style.left = "0";
-  displacement.canvas.style.zIndex = "10";
-  document.body.append(displacement.canvas);
-
-  // Context
-  displacement.context = displacement.canvas.getContext("2d");
-  // displacement.context!.fillStyle = "red";
-  displacement.context!.fillRect(
-    0,
-    0,
-    displacement.canvas.width,
-    displacement.canvas.height
-  );
-
-  // Glow image
-  displacement.glowImage = new Image();
-  displacement.glowImage.src = glowPath;
-
-  // Interactive plane
-  displacement.interactivePlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, 10),
-    new THREE.MeshBasicMaterial({ color: "red", side: THREE.DoubleSide })
-  );
-  displacement.interactivePlane.visible = false;
-  scene.add(displacement.interactivePlane);
-
-  // Raycaster
-  displacement.raycaster = new THREE.Raycaster();
-
-  // Coordinates
-  displacement.screenCursor = new THREE.Vector2(9999, 9999);
-  displacement.canvasCursor = new THREE.Vector2(9999, 9999);
-  displacement.canvasCursorPrevious = new THREE.Vector2(9999, 9999);
-
-  window.addEventListener("pointermove", (event) => {
-    displacement.screenCursor.x = (event.clientX / sizes.width) * 2 - 1;
-    displacement.screenCursor.y = -(event.clientY / sizes.height) * 2 + 1;
-  });
-
-  // Texture
-  displacement.texture = new THREE.CanvasTexture(displacement.canvas);
   /**
    * Particles
    */
-  const particlesGeometry = new THREE.PlaneGeometry(10, 10, 128, 128);
-  particlesGeometry.setIndex(null);
-  particlesGeometry.deleteAttribute("normal");
+  const particles = {};
 
-  const intensityArray = new Float32Array(
-    particlesGeometry.attributes.position.count
-  );
-  const anglesArray = new Float32Array(
-    particlesGeometry.attributes.position.count
-  );
+  // Geometry
+  particles.geometry = new THREE.SphereGeometry(3);
 
-  for (
-    let index = 0;
-    index < particlesGeometry.attributes.position.count;
-    index++
-  ) {
-    intensityArray[index] = Math.random();
-    anglesArray[index] = Math.random() * Math.PI * 2;
-  }
-  particlesGeometry.setAttribute(
-    "aIntensity",
-    new THREE.BufferAttribute(intensityArray, 1)
-  );
-  particlesGeometry.setAttribute(
-    "aAngle",
-    new THREE.BufferAttribute(anglesArray, 1)
-  );
-
-  const particlesMaterial = new THREE.ShaderMaterial({
+  // Material
+  particles.material = new THREE.ShaderMaterial({
     vertexShader: particlesVertexShader,
     fragmentShader: particlesFragmentShader,
     uniforms: {
+      uSize: new THREE.Uniform(0.4),
       uResolution: new THREE.Uniform(
         new THREE.Vector2(
           sizes.width * sizes.pixelRatio,
           sizes.height * sizes.pixelRatio
         )
       ),
-      uPictureTexture: new THREE.Uniform(texturesLoader.load(picturePath)),
-      uDisplacementTexture: new THREE.Uniform(displacement.texture),
     },
-    blending: THREE.AdditiveBlending,
   });
-  const particles = new THREE.Points(particlesGeometry, particlesMaterial);
-  scene.add(particles);
+
+  // Points
+  particles.points = new THREE.Points(particles.geometry, particles.material);
+  scene.add(particles.points);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(5); //创建一个坐标轴辅助对象
@@ -239,7 +172,7 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(0, 0, 18);
+  camera.position.set(0, 0, 8 * 2);
   scene.add(camera);
 
   // Controls
@@ -247,7 +180,7 @@ onMounted(() => {
   controls.enableDamping = true;
 
   // 创建渲染器对象
-  const rendererParameters = { clearColor: "#181818" };
+  const rendererParameters = { clearColor: "#160920" };
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(sizes.pixelRatio);
@@ -268,54 +201,6 @@ onMounted(() => {
     // Update controls
     controls.update();
 
-    /**
-     * Raycaster
-     */
-    displacement.raycaster.setFromCamera(displacement.screenCursor, camera);
-    const intersections = displacement.raycaster.intersectObject(
-      displacement.interactivePlane
-    );
-    if (intersections.length) {
-      const uv = intersections[0].uv;
-      displacement.canvasCursor.x = uv.x * displacement.canvas.width;
-      displacement.canvasCursor.y = (1 - uv.y) * displacement.canvas.height;
-    }
-
-    /**
-     * Displacement
-     */
-    // Fade out
-    displacement.context.globalCompositeOperation = "source-over";
-    displacement.context.globalAlpha = 0.02;
-    displacement.context?.fillRect(
-      0,
-      0,
-      displacement.canvas.width,
-      displacement.canvas.height
-    );
-
-    // Speed alpha
-    const cursorDistance = displacement.canvasCursorPrevious.distanceTo(
-      displacement.canvasCursor
-    );
-    displacement.canvasCursorPrevious.copy(displacement.canvasCursor);
-    const alpha = Math.min(cursorDistance * 0.1, 1);
-
-    // Draw glow
-    const glowSize = displacement.canvas.width * 0.25;
-    displacement.context.globalCompositeOperation = "lighten";
-    displacement.context.globalAlpha = alpha;
-    displacement.context?.drawImage(
-      displacement.glowImage,
-      displacement.canvasCursor.x - glowSize * 0.5,
-      displacement.canvasCursor.y - glowSize * 0.5,
-      glowSize,
-      glowSize
-    );
-
-    // Texture
-    displacement.texture.needsUpdate = true;
-
     renderer.render(scene, camera); //执行渲染操作
     requestAnimationFrame(render); //请求再次执行函数render
   }
@@ -326,7 +211,9 @@ onMounted(() => {
 
   // 创建GUI===================
   gui = new GUI();
-
+  gui.addColor(rendererParameters, "clearColor").onChange(() => {
+    renderer.setClearColor(rendererParameters.clearColor);
+  });
   // 创建GUI===================
 });
 // 组件卸载时移除事件监听

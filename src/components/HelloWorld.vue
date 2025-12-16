@@ -25,6 +25,7 @@ import * as CANNON from "cannon-es";
 import particlesVertexShader from "@/shaders/particles/vertex.glsl";
 import particlesFragmentShader from "@/shaders/particles/fragment.glsl";
 import gpgpuParticlesShader from "@/shaders/gpgpu/particles.glsl";
+import environmentMapsPath from "@/assets/textures/environmentMaps/urban_alley_01_1k.hdr";
 
 const sizes = {
   width: 800,
@@ -104,6 +105,7 @@ loadingManager.onError = (url) => {
 };
 
 const texturesLoader = new THREE.TextureLoader(loadingManager);
+const rgbeLoader = new RGBELoader();
 
 // 1. 初始化 Draco 解码器
 const dracoLoader = new DRACOLoader();
@@ -114,7 +116,7 @@ dracoLoader.setDecoderPath(`${import.meta.env.BASE_URL}draco/`); // 文件路径
 const gltfLoader = new GLTFLoader();
 gltfLoader.setDRACOLoader(dracoLoader);
 
-onMounted(async () => {
+onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
   sizes.width = webgl.value!.clientWidth;
   sizes.height = webgl.value!.clientHeight;
@@ -122,6 +124,13 @@ onMounted(async () => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
+  // HDR (RGBE) equirectangular
+  rgbeLoader.load(environmentMapsPath, (environmentMap) => {
+    environmentMap.mapping = THREE.EquirectangularReflectionMapping;
+
+    scene.background = environmentMap;
+    scene.environment = environmentMap;
+  });
 
   // 创建渲染器对象
   const rendererParameters = { clearColor: "#29191f" };
@@ -129,194 +138,70 @@ onMounted(async () => {
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(sizes.pixelRatio);
   renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
-  gui.addColor(rendererParameters, "clearColor").onChange(() => {
-    renderer.setClearColor(rendererParameters.clearColor);
-  });
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1;
+
   webgl.value!.appendChild(renderer.domElement);
 
   // 模型mesh==========================
 
   /**
-   * Load model
+   * Wobble
    */
-
-  // 3. 加载 Draco 压缩模型（路径指向 glTF-Draco 格式文件）
-  const gltf = await gltfLoader.loadAsync(
-    `${import.meta.env.BASE_URL}models/boat.glb`
-  );
-
-  /**
-   * Base geometry
-   */
-  const baseGeometry = {};
-  // baseGeometry.instance = new THREE.SphereGeometry(3);
-  baseGeometry.instance = gltf.scene.children[0].geometry;
-  baseGeometry.count = baseGeometry.instance.attributes.position.count;
-
-  /**
-   * GPU Compute
-   */
-  // Setup
-  const gpgpu = {};
-  gpgpu.size = Math.ceil(Math.sqrt(baseGeometry.count));
-  gpgpu.computation = new GPUComputationRenderer(
-    gpgpu.size,
-    gpgpu.size,
-    renderer
-  );
-  // Base particles
-  const baseParticlesTexture = gpgpu.computation.createTexture();
-
-  for (let index = 0; index < baseGeometry.count; index++) {
-    const i3 = index * 3;
-    const i4 = index * 4;
-
-    // Position based on geometry
-    baseParticlesTexture.image.data[i4 + 0] =
-      baseGeometry.instance.attributes.position.array[i3 + 0];
-    baseParticlesTexture.image.data[i4 + 1] =
-      baseGeometry.instance.attributes.position.array[i3 + 1];
-    baseParticlesTexture.image.data[i4 + 2] =
-      baseGeometry.instance.attributes.position.array[i3 + 2];
-    baseParticlesTexture.image.data[i4 + 3] = Math.random();
-  }
-
-  // Particles variable
-  gpgpu.particlesVariable = gpgpu.computation.addVariable(
-    "uParticles",
-    gpgpuParticlesShader,
-    baseParticlesTexture
-  );
-  gpgpu.computation.setVariableDependencies(gpgpu.particlesVariable, [
-    gpgpu.particlesVariable,
-  ]);
-
-  // Uniforms
-  gpgpu.particlesVariable.material.uniforms.uTime = new THREE.Uniform(0);
-  gpgpu.particlesVariable.material.uniforms.uDeltaTime = new THREE.Uniform(0);
-  gpgpu.particlesVariable.material.uniforms.uBase = new THREE.Uniform(
-    baseParticlesTexture
-  );
-  gpgpu.particlesVariable.material.uniforms.uFlowFieldInfluence =
-    new THREE.Uniform(0.5);
-  gpgpu.particlesVariable.material.uniforms.uFlowFieldStrength =
-    new THREE.Uniform(2);
-  gpgpu.particlesVariable.material.uniforms.uFlowFieldFrequency =
-    new THREE.Uniform(0.5);
-
-  // Init
-  gpgpu.computation.init();
-
-  // Debug
-  gpgpu.debug = new THREE.Mesh(
-    new THREE.PlaneGeometry(3, 3),
-    new THREE.MeshBasicMaterial({
-      map: gpgpu.computation.getCurrentRenderTarget(gpgpu.particlesVariable)
-        .texture,
-    })
-  );
-  gpgpu.debug.visible = false;
-  gpgpu.debug.position.x = 3;
-  scene.add(gpgpu.debug);
-
-  /**
-   * Particles
-   */
-  const particles = {};
-
-  // Geometry
-  const particlesUvArray = new Float32Array(baseGeometry.count * 2);
-  const sizesArray = new Float32Array(baseGeometry.count);
-
-  for (let y = 0; y < gpgpu.size; y++) {
-    for (let x = 0; x < gpgpu.size; x++) {
-      const i = y * gpgpu.size + x;
-      const i2 = i * 2;
-
-      // Particles UV
-      const uvX = (x + 0.5) / gpgpu.size;
-      const uvY = (y + 0.5) / gpgpu.size;
-
-      particlesUvArray[i2 + 0] = uvX;
-      particlesUvArray[i2 + 1] = uvY;
-
-      // Size
-      sizesArray[i] = Math.random();
-    }
-  }
-
-  particles.geometry = new THREE.BufferGeometry();
-  particles.geometry.setDrawRange(0, baseGeometry.count);
-  particles.geometry.setAttribute(
-    "aParticlesUv",
-    new THREE.BufferAttribute(particlesUvArray, 2)
-  );
-  particles.geometry.setAttribute(
-    "aColor",
-    baseGeometry.instance.attributes.color
-  );
-  particles.geometry.setAttribute(
-    "aSize",
-    new THREE.BufferAttribute(sizesArray, 1)
-  );
-
   // Material
-  particles.material = new THREE.ShaderMaterial({
-    vertexShader: particlesVertexShader,
-    fragmentShader: particlesFragmentShader,
-    uniforms: {
-      uSize: new THREE.Uniform(0.07),
-      uResolution: new THREE.Uniform(
-        new THREE.Vector2(
-          sizes.width * sizes.pixelRatio,
-          sizes.height * sizes.pixelRatio
-        )
-      ),
-      uParticlesTexture: new THREE.Uniform(),
-    },
+  const material = new THREE.MeshPhysicalMaterial({
+    metalness: 0,
+    roughness: 0.5,
+    color: "#ffffff",
+    transmission: 0,
+    ior: 1.5,
+    thickness: 1.5,
+    transparent: true,
+    wireframe: false,
   });
 
-  // Points
-  particles.points = new THREE.Points(particles.geometry, particles.material);
-  scene.add(particles.points);
+  // Tweaks
+  gui.add(material, "metalness", 0, 1, 0.001);
+  gui.add(material, "roughness", 0, 1, 0.001);
+  gui.add(material, "transmission", 0, 1, 0.001);
+  gui.add(material, "ior", 0, 10, 0.001);
+  gui.add(material, "thickness", 0, 10, 0.001);
+  gui.addColor(material, "color");
+
+  // Geometry
+  const geometry = new THREE.IcosahedronGeometry(2.5, 50);
+
+  // Mesh
+  const wobble = new THREE.Mesh(geometry, material);
+  wobble.receiveShadow = true;
+  wobble.castShadow = true;
+  scene.add(wobble);
 
   /**
-   * Tweaks
+   * Plane
    */
-  gui
-    .add(particles.material.uniforms.uSize, "value")
-    .min(0)
-    .max(1)
-    .step(0.001)
-    .name("uSize");
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(15, 15, 15),
+    new THREE.MeshStandardMaterial()
+  );
+  plane.receiveShadow = true;
+  plane.rotation.y = Math.PI;
+  plane.position.y = -5;
+  plane.position.z = 5;
+  scene.add(plane);
 
-  gui
-    .add(
-      gpgpu.particlesVariable.material.uniforms.uFlowFieldInfluence,
-      "value",
-      0,
-      1,
-      0.001
-    )
-    .name("uFlowFieldInfluence");
-  gui
-    .add(
-      gpgpu.particlesVariable.material.uniforms.uFlowFieldStrength,
-      "value",
-      0,
-      10,
-      0.001
-    )
-    .name("uFlowFieldStrength");
-  gui
-    .add(
-      gpgpu.particlesVariable.material.uniforms.uFlowFieldFrequency,
-      "value",
-      0,
-      1,
-      0.001
-    )
-    .name("uFlowFieldFrequency");
+  /**
+   * Lights
+   */
+  const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
+  directionalLight.castShadow = true;
+  directionalLight.shadow.mapSize.set(1024, 1024);
+  directionalLight.shadow.camera.far = 15;
+  directionalLight.shadow.normalBias = 0.05;
+  directionalLight.position.set(0.25, 2, -2.25);
+  scene.add(directionalLight);
 
   // 模型mesh==========================
 
@@ -333,7 +218,7 @@ onMounted(async () => {
     0.1,
     100
   );
-  camera.position.set(4.5, 4, 11);
+  camera.position.set(13, -3, -5);
   scene.add(camera);
 
   // Controls
@@ -352,13 +237,6 @@ onMounted(async () => {
 
     // Update controls
     controls.update();
-
-    // GPGPU Update
-    gpgpu.particlesVariable.material.uniforms.uTime.value = elapsedTime;
-    gpgpu.particlesVariable.material.uniforms.uDeltaTime.value = deltaTime;
-    gpgpu.computation.compute();
-    particles.material.uniforms.uParticlesTexture.value =
-      gpgpu.computation.getCurrentRenderTarget(gpgpu.particlesVariable).texture;
 
     renderer.render(scene, camera); //执行渲染操作
     requestAnimationFrame(render); //请求再次执行函数render

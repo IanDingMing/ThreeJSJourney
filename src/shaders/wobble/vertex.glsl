@@ -12,22 +12,16 @@ varying float vWobble;
 
 #include ../includes/simplexNoise4d.glsl
 
-float getWobble(vec3 position){
+float getWobble(vec3 position) {
     vec3 warpedPosition = position;
-    warpedPosition += simplexNoise4d(
-        vec4(
-            position *uWarpPositionFrequency,
-            uTime*uWarpTimeFrequency
-        )
-    )*uWarpStrength;
+    warpedPosition += simplexNoise4d(vec4(position * uWarpPositionFrequency, uTime * uWarpTimeFrequency)) * uWarpStrength;
 
-    return simplexNoise4d(vec4(
-        warpedPosition * uPositionFrequency, // XYZ
-        uTime *uTimeFrequency // W
+    return simplexNoise4d(vec4(warpedPosition * uPositionFrequency, // XYZ
+    uTime * uTimeFrequency // W
     )) * uStrength;
 }
 
-void main(){
+void main() {
     vec3 biTangent = cross(normal, tangent.xyz);
 
     // Neighbours positions
@@ -47,6 +41,6 @@ void main(){
     csm_Normal = cross(toA, toB);
 
     // Varying
-    vWobble = wobble /uStrength;
+    vWobble = wobble / uStrength;
 
 }

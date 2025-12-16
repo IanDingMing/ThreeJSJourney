@@ -27,7 +27,7 @@ import * as CANNON from "cannon-es";
 import wobbleVertexShader from "@/shaders/wobble/vertex.glsl";
 import wobbleFragmentShader from "@/shaders/wobble/fragment.glsl";
 import gpgpuParticlesShader from "@/shaders/gpgpu/particles.glsl";
-import environmentMapsPath from "@/assets/textures/environmentMaps/urban_alley_01_1k.hdr";
+import environmentMapsPath from "@/assets/textures/environmentMaps/aerodynamics_workshop.hdr";
 
 const sizes = {
   width: 800,
@@ -131,6 +131,7 @@ onMounted(() => {
     environmentMap.mapping = THREE.EquirectangularReflectionMapping;
 
     scene.background = environmentMap;
+    scene.backgroundBlurriness = 0.5;
     scene.environment = environmentMap;
   });
 
@@ -150,134 +151,51 @@ onMounted(() => {
   // 模型mesh==========================
 
   /**
-   * Wobble
+   * Sliced model
    */
-  const debugObject = {
-    colorA: "#0000ff",
-    colorB: "#ff0000",
-  };
-  const uniforms = {
-    uTime: new THREE.Uniform(0),
-    uPositionFrequency: new THREE.Uniform(0.5),
-    uTimeFrequency: new THREE.Uniform(0.4),
-    uStrength: new THREE.Uniform(0.3),
+  // Geometry
+  const geometry = new THREE.IcosahedronGeometry(2.5, 5);
 
-    uWarpPositionFrequency: new THREE.Uniform(0.38),
-    uWarpTimeFrequency: new THREE.Uniform(0.12),
-    uWarpStrength: new THREE.Uniform(1.7),
-
-    uColorA: new THREE.Uniform(new THREE.Color(debugObject.colorA)),
-    uColorB: new THREE.Uniform(new THREE.Color(debugObject.colorB)),
-  };
   // Material
-  const material = new CustomShaderMaterial({
-    // CSM
-    baseMaterial: THREE.MeshPhysicalMaterial,
-    vertexShader: wobbleVertexShader,
-    fragmentShader: wobbleFragmentShader,
-    uniforms,
-    silent: true,
-
-    // MeshPhysicalMaaterial
-    metalness: 0,
-    roughness: 0.5,
-    color: "#ffffff",
-    transmission: 0,
-    ior: 1.5,
-    thickness: 1.5,
-    transparent: true,
-    wireframe: false,
-  });
-  const depthMaterial = new CustomShaderMaterial({
-    // CSM
-    baseMaterial: THREE.MeshDepthMaterial,
-    vertexShader: wobbleVertexShader,
-    uniforms,
-    silent: true,
-
-    // MeshDepthMaterial
-    depthPacking: THREE.RGBADepthPacking,
+  const material = new THREE.MeshStandardMaterial({
+    metalness: 0.5,
+    roughness: 0.25,
+    envMapIntensity: 0.5,
+    color: "#858080",
   });
 
-  // Tweaks
-  gui
-    .add(uniforms.uPositionFrequency, "value", 0, 2, 0.001)
-    .name("uPositionFrequency");
-  gui.add(uniforms.uTimeFrequency, "value", 0, 2, 0.001).name("uTimeFrequency");
-  gui.add(uniforms.uStrength, "value", 0, 2, 0.001).name("uStrength");
-
-  gui
-    .add(uniforms.uWarpPositionFrequency, "value", 0, 2, 0.001)
-    .name("uWarpPositionFrequency");
-  gui
-    .add(uniforms.uWarpTimeFrequency, "value", 0, 2, 0.001)
-    .name("uWarpTimeFrequency");
-  gui.add(uniforms.uWarpStrength, "value", 0, 2, 0.001).name("uWarpStrength");
-
-  gui.addColor(debugObject, "colorA").onChange(() => {
-    uniforms.uColorA.value.set(debugObject.colorA);
-  });
-  gui.addColor(debugObject, "colorB").onChange(() => {
-    uniforms.uColorB.value.set(debugObject.colorB);
-  });
-
-  gui.add(material, "metalness", 0, 1, 0.001);
-  gui.add(material, "roughness", 0, 1, 0.001);
-  gui.add(material, "transmission", 0, 1, 0.001);
-  gui.add(material, "ior", 0, 10, 0.001);
-  gui.add(material, "thickness", 0, 10, 0.001);
-  gui.addColor(material, "color");
-
-  // // Geometry
-  // let geometry = new THREE.IcosahedronGeometry(2.5, 50);
-  // geometry = mergeVertices(geometry);
-  // geometry.computeTangents();
-  // console.log(geometry.attributes);
-
-  // // Mesh
-  // const wobble = new THREE.Mesh(geometry, material);
-  // wobble.customDepthMaterial = depthMaterial;
-  // wobble.receiveShadow = true;
-  // wobble.castShadow = true;
-  // scene.add(wobble);
-
-  // Model
-  // 3. 加载 Draco 压缩模型（路径指向 glTF-Draco 格式文件）
-gltfLoader.load(
-  `${import.meta.env.BASE_URL}models/suzanne1.glb`,
-  (gltf) => {
-    const wobble = gltf.scene.children[0]
-    wobble.receiveShadow = true
-    wobble.castShadow = true
-    wobble.material = material
-    wobble.customDepthMaterial = depthMaterial
-
-    scene.add(wobble);
-  },
-);
+  // Mesh
+  const mesh = new THREE.Mesh(geometry, material);
+  scene.add(mesh);
 
   /**
    * Plane
    */
   const plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(15, 15, 15),
-    new THREE.MeshStandardMaterial()
+    new THREE.PlaneGeometry(10, 10, 10),
+    new THREE.MeshStandardMaterial({ color: "#aaaaaa" })
   );
   plane.receiveShadow = true;
-  plane.rotation.y = Math.PI;
-  plane.position.y = -5;
-  plane.position.z = 5;
+  plane.position.x = -4;
+  plane.position.y = -3;
+  plane.position.z = -4;
+  plane.lookAt(new THREE.Vector3(0, 0, 0));
   scene.add(plane);
 
   /**
    * Lights
    */
-  const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
+  const directionalLight = new THREE.DirectionalLight("#ffffff", 4);
+  directionalLight.position.set(6.25, 3, 4);
   directionalLight.castShadow = true;
   directionalLight.shadow.mapSize.set(1024, 1024);
-  directionalLight.shadow.camera.far = 15;
+  directionalLight.shadow.camera.near = 0.1;
+  directionalLight.shadow.camera.far = 30;
   directionalLight.shadow.normalBias = 0.05;
-  directionalLight.position.set(0.25, 2, -2.25);
+  directionalLight.shadow.camera.top = 8;
+  directionalLight.shadow.camera.right = 8;
+  directionalLight.shadow.camera.bottom = -8;
+  directionalLight.shadow.camera.left = -8;
   scene.add(directionalLight);
 
   // 模型mesh==========================
@@ -295,7 +213,7 @@ gltfLoader.load(
     0.1,
     100
   );
-  camera.position.set(13, -3, -5);
+  camera.position.set(-5, 5, 12);
   scene.add(camera);
 
   // Controls
@@ -308,9 +226,6 @@ gltfLoader.load(
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
-
-    // Materials
-    uniforms.uTime.value = elapsedTime;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});

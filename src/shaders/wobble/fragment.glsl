@@ -3,9 +3,9 @@ uniform vec3 uColorB;
 
 varying float vWobble;
 
-void main(){
-    float colorMix = smoothstep(-1.0,1.0,vWobble);
-    csm_DiffuseColor.rgb = mix(uColorA,uColorB,colorMix);
+void main() {
+    float colorMix = smoothstep(-1.0, 1.0, vWobble);
+    csm_DiffuseColor. g  = mix(uColo rA,uColo rB,colorMi
 
     // Mirror step
     // csm_Metalness = step(.25,vWobble);

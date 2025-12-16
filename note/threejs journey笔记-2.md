@@ -4409,9 +4409,228 @@ strength值:                0.0→1.0平滑过渡
 
 
 
+## P44 Wobbly  Sphere Shader
+
+### 📦 核心概念
+
+[**Custom Shader Material**](https://www.npmjs.com/package/three-custom-shader-material)是一个用于在 Three.js 标准材质基础上添加自定义着色器代码的工具，通过**扩展而非替换**的方式工作，保留原材质的光照、阴影、PBR等特性，同时实现自定义效果。
+
+### 🔍 核心问题与解决方案
+
+#### 1. 表面波动与阴影问题
+
+**问题根源**：
+
+- 顶点通过噪声函数形变后，**几何形状改变**
+- 但**原始法线未更新**，仍指向原方向
+- 导致**光照计算错误**，阴影显示为原始表面状态
+
+**完整解决思路**：
+
+##### ① 表面波动实现
+
+glsl
+
+```
+// 应用噪声函数产生波动
+float wobble = getWobble(csm_Position);
+csm_Position += wobble * normal;  // 沿法线方向偏移
+```
 
 
-## P44
+
+##### ② 法线重新计算（核心）
+
+关键突破：**曲面不能直接用xz平面计算**，需要局部坐标系
+
+数学原理：
+
+当表面函数为 `P(x,y) = (x, y, f(x,y))` 时：
+
+- 切线向量：`T = ∂P/∂x`
+- 副法线向量：`B = ∂P/∂y`
+- 法线向量：`N = T × B`（叉乘）
+
+glsl
+
+```
+// 步骤1：获取基础向量
+vec3 biTangent = cross(normal, tangent.xyz);
+
+// 步骤2：计算相邻点（数值微分）
+float shift = 0.01;
+vec3 positionA = csm_Position + tangent.xyz * shift;
+vec3 positionB = csm_Position + biTangent.xyz * shift;
+
+// 步骤3：对每个点应用相同的形变函数
+float wobble = getWobble(csm_Position);
+csm_Position += wobble * normal;  // 形变当前点
+positionA += getWobble(positionA) * normal;  // 形变切线方向点
+positionB += getWobble(positionB) * normal;  // 形变副切线方向点
+
+// 步骤4：计算新的切平面向量
+vec3 toA = normalize(positionA - csm_Position);  // 近似∂P/∂x
+vec3 toB = normalize(positionB - csm_Position);  // 近似∂P/∂y
+
+// 步骤5：叉乘得到新法线并归一化
+csm_Normal = normalize(cross(toA, toB));
+```
+
+
+
+**为什么需要切线和副切线**：
+
+- 切线和副切线是**单位向量**，构成曲面局部坐标系
+- 乘以 `shift = 0.01` 实现**数值微分**：
+  - 微小偏移获取相邻点位置
+  - 近似计算表面导数
+  - 平衡精度与浮点稳定性
+
+##### ③ 阴影修复
+
+问题：阴影映射使用**深度材质**，未包含波动计算
+
+javascript
+
+```
+const depthMaterial = new CustomShaderMaterial({
+    baseMaterial: THREE.MeshDepthMaterial,
+    vertexShader: wobbleVertexShader,  // 使用相同的波动着色器
+    uniforms,
+    depthPacking: THREE.RGBADepthPacking  // 提高深度精度
+});
+
+wobble.customDepthMaterial = depthMaterial;
+```
+
+
+
+#### 2. depthPacking: THREE.RGBADepthPacking
+
+##### **作用与区别**
+
+| 设置                 | 渲染结果     | 存储方式                 | 精度             |
+| :------------------- | :----------- | :----------------------- | :--------------- |
+| **无/默认**          | 单通道灰度图 | R通道存储深度            | 8位/通道         |
+| **RGBADepthPacking** | RGBA四通道图 | 32位深度拆分为4个8位分量 | 等效32位浮点精度 |
+
+##### **工作原理**
+
+glsl
+
+```
+// 编码过程（Three.js内部处理）
+vec4 packDepthToRGBA(float depth) {
+    const vec4 bitShift = vec4(1.0, 256.0, 256.0 * 256.0, 256.0 * 256.0 * 256.0);
+    const vec4 bitMask = vec4(1.0/256.0, 1.0/256.0, 1.0/256.0, 0.0);
+    vec4 res = fract(depth * bitShift);
+    res -= res.xxyz * bitMask;
+    return res;
+}
+```
+
+##### **实际应用场景**：
+
+1. **阴影映射**：需要高精度深度比较时
+2. **自定义深度材质**：如示例中的 `MeshDepthMaterial`
+3. **后期处理**：需要精确深度信息的特效（如景深、雾效）
+4. **几何重建**：从深度纹理重建世界位置
+
+**在示例中的用途**：
+
+javascript
+
+```
+const depthMaterial = new CustomShaderMaterial({
+    baseMaterial: THREE.MeshDepthMaterial,
+    vertexShader: wobbleVertexShader,
+    uniforms,
+    depthPacking: THREE.RGBADepthPacking,  // 启用高精度深度打包
+});
+```
+
+#### 
+
+#### 3. csm_DiffuseColor 与 csm_FragColor 区别
+
+##### **光照管线差异**
+
+text
+
+```
+csm_DiffuseColor 路径：
+自定义颜色 → 基础材质光照计算 → 阴影、反射、折射 → 最终输出
+
+csm_FragColor 路径：
+自定义颜色 → 直接输出（绕过所有材质计算）
+```
+
+
+
+##### **技术实现对比**
+
+| 特性         | csm_DiffuseColor     | csm_FragColor          |
+| :----------- | :------------------- | :--------------------- |
+| **光照计算** | 保留，基于物理       | 完全绕过               |
+| **PBR支持**  | 支持金属度、粗糙度等 | 不支持                 |
+| **阴影**     | 自动计算             | 需要手动实现           |
+| **性能**     | 较重（完整管线）     | 较轻（直接输出）       |
+| **使用场景** | 需要真实感材质       | 全屏特效、UI、卡通渲染 |
+
+### 
+
+### 📊 GLSL向量运算核心
+
+#### dot（点积）与 cross（叉积）对比
+
+| 特性         | 点积（dot）       | 叉积（cross）        |
+| :----------- | :---------------- | :------------------- |
+| **结果类型** | 标量（float）     | 向量（vec3）         |
+| **输入维度** | 任意相同维度      | 仅三维向量           |
+| **几何意义** | 相似度/投影       | 垂直方向/面积        |
+| **交换律**   | 可交换：a·b = b·a | 不可交换：a×b = -b×a |
+
+#### 关键应用场景
+
+点积典型用途
+
+glsl
+
+```
+// 光照计算
+float diffuse = max(dot(normal, lightDir), 0.0);
+
+// 菲涅尔效应
+float fresnel = pow(1.0 - dot(viewDir, normal), 5.0);
+
+// 边缘检测
+float rim = 1.0 - dot(normal, viewDir);
+```
+
+
+
+叉积典型用途
+
+glsl
+
+```
+// 构建切线空间
+vec3 bitangent = cross(normal, tangent.xyz);
+
+// 计算表面法线
+csm_Normal = normalize(cross(toA, toB));
+
+// 计算三角形面积
+float area = 0.5 * length(cross(edge1, edge2));
+```
+
+
+
+
+
+
+
+## P45
 
 
 

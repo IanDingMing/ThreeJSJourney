@@ -27,7 +27,7 @@ import * as CANNON from "cannon-es";
 import slicedVertexShader from "@/shaders/sliced/vertex.glsl";
 import slicedFragmentShader from "@/shaders/sliced/fragment.glsl";
 import gpgpuParticlesShader from "@/shaders/gpgpu/particles.glsl";
-import environmentMapsPath from "@/assets/textures/environmentMaps/aerodynamics_workshop.hdr";
+import environmentMapsPath from "@/assets/textures/environmentMaps/spruit_sunrise.hdr";
 
 const sizes = {
   width: 800,
@@ -149,112 +149,24 @@ onMounted(() => {
   webgl.value!.appendChild(renderer.domElement);
 
   // 模型mesh==========================
-
   /**
-   * Sliced model
+   * Placeholder
    */
-  const uniforms = {
-    uSliceStart: new THREE.Uniform(1.75),
-    uSliceArc: new THREE.Uniform(1.25),
-  };
-
-  gui
-    .add(uniforms.uSliceStart, "value", -Math.PI, Math.PI, 0.001)
-    .name("uSliceStart");
-  gui.add(uniforms.uSliceArc, "value", 0, Math.PI * 2, 0.001).name("uSliceArc");
-
-  const patchMap = {
-    csm_Slice: {
-      "#include <colorspace_fragment>": `
-            #include <colorspace_fragment>
-
-            if(!gl_FrontFacing)
-                gl_FragColor = vec4(0.75, 0.15, 0.3, 1.0);
-        `,
-    },
-  };
-
-  // Material
-  const material = new THREE.MeshStandardMaterial({
-    metalness: 0.5,
-    roughness: 0.25,
-    envMapIntensity: 0.5,
-    color: "#858080",
-  });
-  const slicedMaterial = new CustomShaderMaterial({
-    // CSM
-    baseMaterial: THREE.MeshStandardMaterial,
-    vertexShader: slicedVertexShader,
-    fragmentShader: slicedFragmentShader,
-    uniforms,
-    patchMap,
-    silent: true,
-
-    // MeshStandardMaterial
-    metalness: 0.5,
-    roughness: 0.25,
-    envMapIntensity: 0.5,
-    color: "#858080",
-    side: THREE.DoubleSide,
-  });
-  const slicedDepthMaterial = new CustomShaderMaterial({
-    // CSM
-    baseMaterial: THREE.MeshDepthMaterial,
-    vertexShader: slicedVertexShader,
-    fragmentShader: slicedFragmentShader,
-    uniforms,
-    patchMap,
-    silent: true,
-
-    // MeshDepthMaterial
-    depthPacking: THREE.RGBADepthPacking,
-  });
-
-  // Model
-  // 3. 加载 Draco 压缩模型（路径指向 glTF-Draco 格式文件）
-  gltfLoader.load(`${import.meta.env.BASE_URL}models/gears.glb`, (gltf) => {
-    model = gltf.scene;
-
-    model.traverse((child) => {
-      if (child.isMesh) {
-        if (child.name === "outerHull") {
-          child.material = slicedMaterial;
-          child.customDepthMaterial = slicedDepthMaterial;
-        } else {
-          child.material = material;
-        }
-
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-    scene.add(model);
-  });
-
-  /**
-   * Plane
-   */
-  const plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, 10, 10),
-    new THREE.MeshStandardMaterial({ color: "#aaaaaa" })
+  const placeholder = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(2, 5),
+    new THREE.MeshPhysicalMaterial()
   );
-  plane.receiveShadow = true;
-  plane.position.x = -4;
-  plane.position.y = -3;
-  plane.position.z = -4;
-  plane.lookAt(new THREE.Vector3(0, 0, 0));
-  scene.add(plane);
+  scene.add(placeholder);
 
   /**
    * Lights
    */
-  const directionalLight = new THREE.DirectionalLight("#ffffff", 4);
+  const directionalLight = new THREE.DirectionalLight("#ffffff", 2);
   directionalLight.position.set(6.25, 3, 4);
   directionalLight.castShadow = true;
   directionalLight.shadow.mapSize.set(1024, 1024);
   directionalLight.shadow.camera.near = 0.1;
   directionalLight.shadow.camera.far = 30;
-  directionalLight.shadow.normalBias = 0.05;
   directionalLight.shadow.camera.top = 8;
   directionalLight.shadow.camera.right = 8;
   directionalLight.shadow.camera.bottom = -8;
@@ -276,7 +188,7 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(-5, 5, 12);
+  camera.position.set(-10, 6, -2);
   scene.add(camera);
 
   // Controls
@@ -289,9 +201,6 @@ onMounted(() => {
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
-
-    // Update model
-    model && (model.rotation.y = elapsedTime * 0.1);
 
     // Animate meshes
     meshArray.forEach((mesh) => {});

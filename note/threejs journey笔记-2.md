@@ -4628,9 +4628,222 @@ float area = 0.5 * length(cross(edge1, edge2));
 
 
 
+## P45 Sliced Model Shader
+
+### 一、核心思路：动态切割3D模型
+
+#### 目标效果
+
+创建一个动态的扇形切割效果，让模型的一部分被"切除"，可以看到内部结构，类似于机械模型的截面展示。
+
+------
+
+### 二、实现步骤详解
+
+#### 第1步：基本角度计算与丢弃
+
+glsl
+
+```
+// 使用atan计算每个片元的极坐标角度
+float angle = atan(vPosition.y, vPosition.x);
+// 直接丢弃特定角度范围内的片元
+if(angle > uSliceStart && angle < uSliceStart + uSliceArc) {
+    discard;
+}
+```
 
 
-## P45
+
+**问题**：直接这样写会遇到角度循环问题（-π和π表示同一个方向）。
+
+------
+
+#### 第2步：解决角度计算问题 - 基准点平移
+
+##### 关键理解：`angle -= uSliceStart;`
+
+**几何意义**：
+
+1. 假设原始坐标系中，X轴正方向是0度
+2. `uSliceStart` 是我们想要开始切割的位置（比如115°）
+3. 执行 `angle -= uSliceStart` 相当于：
+   - **将所有的点顺时针旋转 uSliceStart 角度**
+   - **等价于将坐标轴逆时针旋转 uSliceStart 角度**
+
+##### 举例说明：
+
+假设 `uSliceStart = 2.0`（约115°）：
+
+- 原本在115°的点 → 现在在0°
+- 原本在150°的点 → 现在在35°
+- 原本在60°的点 → 现在在-55°
+
+**这样做的目的**：把切割起始点变成新的"0度参考点"，使后续判断变得简单。
+
+------
+
+#### 第3步：角度归一化处理
+
+##### 问题：负角度的处理
+
+- 平移后，有些点角度变为负值（如-55°）
+- 但在圆周上，-55°和305°是同一个点
+
+##### 解决方案：`angle = mod(angle, PI2);`
+
+**作用**：将所有角度映射到 [0, 2π) 区间
+
+- -55° → 305°（360° - 55°）
+- 370° → 10°（370° - 360°）
+
+**最终代码**：
+
+glsl
+
+```
+float angle = atan(vPosition.y, vPosition.x);
+angle -= uSliceStart;    // 基准点平移（坐标轴逆时针旋转）
+angle = mod(angle, PI2); // 角度归一化到[0, 2π)
+
+if(angle < uSliceArc) {  // 判断是否在切割范围内
+    discard;
+}
+```
+
+
+
+**现在只需要判断是否在 [0, uSliceArc] 范围内！**
+
+------
+
+### 三、解决模型空心显示问题
+
+#### 问题：切割后内部不可见
+
+当模型被切割后，内部是空的，但通常我们希望看到内部结构。
+
+#### 初始方案：背面着色
+
+glsl
+
+```
+if(!gl_FrontFacing) {
+    csm_FragColor = vec4(.75, .15, .3, 1.0); // 给背面设置红色
+}
+```
+
+
+
+**新问题**：这样设置会跳过Three.js的正常渲染流程，导致阴影、光照等效果丢失。
+
+------
+
+#### 最终方案：使用patchMap
+
+**原理**：在Three.js的着色器编译过程中插入自定义代码，而不影响原有渲染管线。
+
+javascript
+
+```
+const patchMap = {
+    csm_Slice: {
+        "#include <colorspace_fragment>": `
+            #include <colorspace_fragment>
+            
+            // 在颜色空间转换后，添加背面颜色
+            if(!gl_FrontFacing) {
+                gl_FragColor = vec4(0.75, 0.15, 0.3, 1.0);
+            }
+        `,
+    },
+};
+```
+
+
+
+**优势**：
+
+1. 保留了Three.js原有的光照、阴影计算
+2. 只在最终颜色输出阶段修改背面颜色
+3. 不影响深度测试、模板测试等渲染流程
+
+------
+
+### 四、完整实现流程
+
+#### 1. 顶点着色器（vertex.glsl）
+
+glsl
+
+```
+varying vec3 vPosition;
+void main() {
+    vPosition = csm_Position.xyz; // 传递模型空间位置
+    // 其他顶点变换代码...
+}
+```
+
+
+
+#### 2. 片段着色器（fragment.glsl）
+
+glsl
+
+```
+uniform float uSliceStart;
+uniform float uSliceArc;
+varying vec3 vPosition;
+
+#define PI2 6.28318530718
+
+void main() {
+    // 计算并处理角度
+    float angle = atan(vPosition.y, vPosition.x);
+    angle -= uSliceStart;    // 关键：基准点平移
+    angle = mod(angle, PI2); // 归一化
+    
+    // 切割判断
+    if(angle < uSliceArc) {
+        discard;
+    }
+    
+    // 注意：不再直接设置csm_FragColor
+    // 背面颜色通过patchMap处理
+    // 正面的正常材质颜色由Three.js自动处理
+}
+```
+
+
+
+#### 3. JavaScript材质配置
+
+javascript
+
+```
+const uniforms = {
+    uSliceStart: { value: 1.75 },
+    uSliceArc: { value: 1.25 }
+};
+
+const slicedMaterial = new CustomShaderMaterial({
+    baseMaterial: THREE.MeshStandardMaterial,
+    vertexShader: slicedVertexShader,
+    fragmentShader: slicedFragmentShader,
+    uniforms: uniforms,
+    patchMap: patchMap, // 关键：插入背面颜色逻辑
+    side: THREE.DoubleSide, // 双面渲染
+    // 其他材质属性...
+});
+```
+
+
+
+
+
+
+
+## P46
 
 
 

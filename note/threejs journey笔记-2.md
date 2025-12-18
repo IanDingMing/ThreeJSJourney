@@ -1,4 +1,4 @@
-## P27  Realistic render
+## P27  Realistic render 真实渲染
 
 ### 问题背景
 
@@ -598,7 +598,7 @@ precision mediump float;
 
 
 
-## P30 Shaders patterns
+## P30 Shaders patterns 着色器图案
 
 ### 1. 预定义
 
@@ -795,7 +795,7 @@ gl_FragColor = vec4(vec3(strength), 1.0);
 
 
 
-## P31 Raging sea
+## P31 Raging sea 海洋
 
 ### 1. **着色器材质系统**
 
@@ -916,7 +916,7 @@ waterMaterial.uniforms.uDepthColor.value = new THREE.Color(newColor);
 
 
 
-## P32 Animated galaxy
+## P32 Animated galaxy 转动星系
 
 ### 1. `uSize` 优化写法解释
 
@@ -1029,7 +1029,7 @@ strength = pow(strength, 10.0); // 提高对比度，中心更亮
 
 
 
-## P33 Modified materials
+## P33 Modified materials 材质修改
 
 ### 1. 为什么要学习材质效果提升？
 
@@ -1231,7 +1231,7 @@ material.onBeforeCompile = (shader) => {
 
 
 
-## P34 Coffee Smoke Shader
+## P34 Coffee Smoke Shader 一杯咖啡
 
 ### 核心概念理解
 
@@ -1353,7 +1353,7 @@ const smokeMaterial = new THREE.ShaderMaterial({
 
 
 
-## P35 Hologram Shader
+## P35 Hologram Shader 全息材质
 
 ### 1. 菲涅耳效应详解
 
@@ -1519,7 +1519,7 @@ void main() {
 
 
 
-## P36 Fireworks Shaders
+## P36 Fireworks Shaders 落日烟花
 
 ### 1. 点精灵（Point Sprites）系统
 
@@ -2044,7 +2044,7 @@ sizeProgress = clamp(sizeProgress, 0.0, 1.0);
 
 
 
-## P37 Lights Shading Shaders
+## P37 Lights Shading Shaders 着色器实现光照
 
 ### 难点1：光照模型实现
 
@@ -2218,7 +2218,7 @@ color *= light;
 
 
 
-## P38 Raging Sea Shading Shaders
+## P38 Raging Sea Shading Shaders 狂暴水面
 
 ### 为什么必须在片元着色器中进行归一化，而不是在顶点着色器传入时候直接计算好传入，这有什么区别吗？
 
@@ -2337,7 +2337,7 @@ if(normalLength < 0.9 || normalLength > 1.1) {
 
 
 
-## P39 Halftone Shading Shaders
+## P39 Halftone Shading Shaders 半色调
 
 ### 一、内置变量：gl_FragCoord vs gl_PointCoord
 
@@ -2452,7 +2452,7 @@ intensity = smoothstep(low, high, intensity);  // intensity范围[-1,1]
 
 
 
-## P40 Earth Shaders
+## P40 Earth Shaders 地球
 
 [太阳系各大行星3D展开贴图资源](https://www.solarsystemscope.com/)
 
@@ -2672,7 +2672,7 @@ side: THREE.BackSide
 
 
 
-## P41 Particles Cursor Animation Shader
+## P41 Particles Cursor Animation Shader 图片粒子化
 
 ### 一、`discard` 关键字详解
 
@@ -3340,7 +3340,7 @@ alpha = Math.min(10 * 0.05, 1) = 0.5; // 需要移动20像素才达到最大
 
 
 
-## P42 Particles Morphing Shader
+## P42 Particles Morphing Shader 模型粒子化切换
 
 ### 一、为什么需要每个模型的顶点数相同？
 
@@ -3888,7 +3888,7 @@ if (camera.position.distanceTo(particles.position) > 100) {
 
 
 
-## P43 GPGPU Glow Field Particles Shaders
+## P43 GPGPU Glow Field Particles Shaders 粒子船
 
 ### 课程核心目标
 
@@ -4409,7 +4409,7 @@ strength值:                0.0→1.0平滑过渡
 
 
 
-## P44 Wobbly  Sphere Shader
+## P44 Wobbly  Sphere Shader 流体球 曲面法线计算
 
 ### 📦 核心概念
 
@@ -4628,7 +4628,7 @@ float area = 0.5 * length(cross(edge1, edge2));
 
 
 
-## P45 Sliced Model Shader
+## P45 Sliced Model Shader 截面展示
 
 ### 一、核心思路：动态切割3D模型
 
@@ -4841,9 +4841,398 @@ const slicedMaterial = new CustomShaderMaterial({
 
 
 
+## P46 Procedural Terrain Shader 山峦
+
+### 📚 课程核心思路概览
+
+本课程通过 **5个关键技术环节** 构建完整的程序化地形系统：
+
+text
+
+```
+1. 模型操作 → 2. 地形生成 → 3. 阴影优化 → 4. 材质效果 → 5. 视觉美化
+   ↓           ↓           ↓           ↓           ↓
+three-bvh-csg 噪声叠加   法线计算    水面材质    颜色混合
+ 布尔运算     分形地形   customDepth 透射效果    高度分层
+```
 
 
-## P46
+
+### 🎯 一、利用 [three-bvh-csg](https://www.npmjs.com/package/three-bvh-csg) 实现模型的拉伸切除
+
+
+
+#### 1.1 创建"画框"效果
+
+javascript
+
+```
+// 1. 创建两个基础几何体作为刷子
+const boardFill = new Brush(new THREE.BoxGeometry(11, 2, 11));  // 外框填充
+const boardHole = new Brush(new THREE.BoxGeometry(10, 2.1, 10)); // 内部挖空
+
+// 2. 关键：调整挖空位置，实现底部保留
+boardHole.position.y = 0.2  // 向上偏移，保留底部
+boardHole.updateMatrixWorld()  // 必须调用，更新世界矩阵
+
+// 3. 执行布尔减法运算（挖空效果）
+const evaluator = new Evaluator();
+const board = evaluator.evaluate(boardFill, boardHole, SUBTRACTION);
+
+// 4. 清理分组并设置材质
+board.geometry.clearGroups();
+board.material = new THREE.MeshStandardMaterial({
+    color: "#ffffff",
+    metalness: 0,
+    roughness: 0.3,
+});
+```
+
+
+
+#### 1.2 技术要点解析
+
+- **布尔运算**：使用减法(SUBTRACTION)创建边框
+- **位置偏移**：通过 `position.y = 0.2` 保留底部厚度
+- **矩阵更新**：`updateMatrixWorld()` 确保变换生效
+- **分组清理**：`clearGroups()` 避免材质分组干扰
+
+### 🌄 二、叠加噪声创造地形（分形噪声详解）
+
+#### 2.1 分形噪声叠加原理
+
+glsl
+
+```
+// 核心代码解析：
+float getElevation(vec2 position) {
+    // 1. 基础噪声层（低频，决定大结构）
+    elevation += simplexNoise2d(position * uPositionFrequency) / 2.0;
+    
+    // 2. 细节噪声层（中频，添加山脊等特征）
+    elevation += simplexNoise2d(position * uPositionFrequency * 2.0) / 4.0;
+    
+    // 3. 精细噪声层（高频，表面纹理）
+    elevation += simplexNoise2d(position * uPositionFrequency * 4.0) / 8.0;
+    
+    return elevation;
+}
+```
+
+
+
+#### 2.2 分形噪声可视化解释
+
+text
+
+```
+频率/振幅关系：
+第1层：频率×1，振幅×1/2  → 控制大型山脉山谷
+第2层：频率×2，振幅×1/4  → 添加中等山脊丘陵
+第3层：频率×4，振幅×1/8  → 提供表面粗糙细节
+
+最终地形 = 大型地形 + 中型特征 + 微小细节
+```
+
+
+
+#### 2.3 为什么要这样叠加？
+
+1. **自相似性**：在不同尺度上都有类似的结构
+2. **计算效率**：3-5层就能获得很好的自然效果
+3. **可控性**：通过权重系数精确控制各层贡献
+4. **避免平铺感**：多频率叠加打破重复模式
+
+### ⚡ 三、更新法线修正阴影
+
+#### 3.1 法线计算原理
+
+glsl
+
+```
+// 手动计算法线（因为顶点位置被程序修改）
+void main() {
+    // 1. 获取当前点相邻的两个点
+    vec3 positionA = position.xyz + vec3(shift, .0, .0);
+    vec3 positionB = position.xyz + vec3(.0, .0, -shift);
+    
+    // 2. 计算相邻点的海拔
+    positionA.y = getElevation(positionA.xz);
+    positionB.y = getElevation(positionB.xz);
+    
+    // 3. 计算方向向量并叉积得到法线
+    vec3 toA = normalize(positionA - csm_Position);
+    vec3 toB = normalize(positionB - csm_Position);
+    csm_Normal = cross(toA, toB);
+}
+```
+
+
+
+#### 3.2 为什么必须手动计算法线？
+
+- **原始法线失效**：顶点位置被噪声函数修改
+- **光照依赖法线**：法线决定表面如何反射光线
+- **阴影准确性**：错误的法线会导致阴影异常
+- **视觉真实感**：正确的法线提供立体感和深度感
+
+### 🎭 四、更新 customDepthMaterial 修正整体阴影
+
+#### 4.1 深度材质配置
+
+javascript
+
+```
+// 创建自定义深度材质（用于阴影计算）
+const depthMaterial = new CustomShaderMaterial({
+    baseMaterial: THREE.MeshDepthMaterial,  // 基础深度材质
+    vertexShader: terrainVertexShader,      // 使用相同顶点着色器
+    uniforms,
+    depthPacking: THREE.RGBADepthPacking    // 深度打包方式
+});
+
+// 应用到地形网格
+terrain.customDepthMaterial = depthMaterial;
+```
+
+
+
+#### 4.2 深度材质的重要性
+
+text
+
+```
+默认阴影计算：
+地形平面 → 原始几何体 → 错误阴影
+
+自定义深度材质：
+地形平面 → 程序化几何体 → 正确阴影
+
+原因：Three.js的阴影系统需要知道顶点的实际位置
+```
+
+
+
+#### 4.3 技术实现细节
+
+1. **复用顶点着色器**：确保深度计算与渲染一致
+2. **深度打包**：`RGBADepthPacking` 优化精度
+3. **性能考虑**：深度材质仅用于阴影计算，不参与渲染
+
+### 💧 五、Water 为什么用 MeshPhysicalMaterial
+
+#### 5.1 材质选择对比
+
+javascript
+
+```
+// 方案1：MeshPhysicalMaterial（正确选择）
+const waterMaterial = new THREE.MeshPhysicalMaterial({
+    transmission: 1,      // 物理透射效果
+    roughness: 0.3,       // 水面粗糙度
+    // 支持折射、菲涅尔效应等
+});
+
+// 方案2：MeshStandardMaterial（次选）
+const waterMaterial2 = new THREE.MeshStandardMaterial({
+    opacity: 0.5,         // 简单透明度
+    // 缺乏物理透射，水看起来不真实
+});
+
+// 方案3：MeshBasicMaterial（错误选择）
+const waterMaterial3 = new THREE.MeshBasicMaterial({
+    color: 0x66a8ff,
+    transparent: true,
+    opacity: 0.7
+    // 无光照交互，像彩色玻璃
+});
+```
+
+
+
+#### 5.2 MeshPhysicalMaterial 的核心优势
+
+1. **物理透射(transmission)**：模拟光线穿过水体的物理行为
+2. **折射效果**：自动计算折射，无需手动编写着色器
+3. **菲涅尔效应**：不同角度反射率不同（水面特征）
+4. **与PBR系统集成**：与其他PBR材质光照一致
+5. **性能优化**：相比自定义ShaderMaterial更高效
+
+#### 5.3 水的物理特性实现
+
+javascript
+
+```
+// 完整的水面材质配置示例
+const waterMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x66a8ff,           // 基础颜色
+    transmission: 0.95,        // 透射率（0-1）
+    roughness: 0.1,            // 表面粗糙度
+    ior: 1.33,                 // 水的折射率
+    thickness: 0.5,            // 材质厚度
+    specularIntensity: 1,      // 镜面反射强度
+    envMap: environmentMap,    // 环境贴图（必须）
+    envMapIntensity: 1         // 环境贴图强度
+});
+```
+
+
+
+### 🎨 六、颜色混合实现地形
+
+#### 6.1 基于高度的颜色分层
+
+glsl
+
+```
+// 核心混合策略
+void main() {
+    vec3 color = vec3(1.0);
+    
+    // 1. 水体深度渐变（平滑过渡）
+    float surfaceWaterMix = smoothstep(-1.0, -.1, vPosition.y);
+    color = mix(uColorWaterDeep, uColorWaterSurface, surfaceWaterMix);
+    
+    // 2. 沙滩边界（硬过渡）
+    float sandMix = step(-.1, vPosition.y);
+    color = mix(color, uColorSand, sandMix);
+    
+    // 3. 草地边界（硬过渡）
+    float grassMix = step(-.06, vPosition.y);
+    color = mix(color, uColorGrass, grassMix);
+    
+    // 4. 岩石（基于坡度）
+    float rockMix = vUpDot;  // 法线与上方向的点积（坡度）
+    rockMix = 1.0 - step(.8, rockMix);  // 坡度>0.8显示岩石
+    rockMix *= grassMix;  // 只在草地上显示岩石
+    color = mix(color, uColorRock, rockMix);
+    
+    // 5. 雪地（带噪声扰动的边界）
+    float snowThreshold = .45;
+    snowThreshold += simplexNoise2d(vPosition.xz * 15.0) * .1;
+    float snowMix = step(snowThreshold, vPosition.y);
+    color = mix(color, uColorSnow, snowMix);
+}
+```
+
+
+
+#### 6.2 混合函数详解
+
+#### smoothstep - 平滑过渡
+
+glsl
+
+```
+// 适合：水体深度渐变
+float mixValue = smoothstep(min, max, height);
+color = mix(colorA, colorB, mixValue);
+// 效果：min到max之间平滑过渡
+```
+
+
+
+#### step - 硬边界
+
+glsl
+
+```
+// 适合：沙滩/草地边界
+float mixValue = step(threshold, height);
+color = mix(colorA, colorB, mixValue);
+// 效果：height>threshold时使用colorB
+```
+
+
+
+##### 基于坡度的混合
+
+glsl
+
+```
+// 法线与垂直方向的点积
+float vUpDot = dot(normal, vec3(0,1,0));
+// 值1.0 = 完全水平，值0.0 = 垂直
+
+// 岩石混合逻辑
+if (vUpDot < 0.8) {  // 坡度较陡
+    color = mix(color, rockColor, 1.0);
+}
+```
+
+
+
+#### 6.3 颜色配置文件
+
+javascript
+
+```
+// GUI可调的颜色配置
+const debugObject = {
+    colorWaterDeep: '#002b3d',     // 深水区颜色
+    colorWaterSurface: '#66a8ff',  // 水面颜色
+    colorSand: '#ffe894',          // 沙滩颜色
+    colorGrass: '#85d534',         // 草地颜色
+    colorSnow: '#ffffff',          // 雪地颜色
+    colorRock: '#bfbd8d',          // 岩石颜色
+};
+
+// 实时更新Uniforms
+gui.addColor(debugObject, 'colorGrass')
+   .onChange(() => {
+       uniforms.uColorGrass.value.set(debugObject.colorGrass);
+   });
+```
+
+
+
+### 🔄 七、完整工作流程总结
+
+#### 7.1 从零到完整地形的步骤
+
+text
+
+```
+1. 基础几何体准备
+   ↓
+2. 分形噪声生成地形
+   ↓
+3. 计算正确法线
+   ↓
+4. 配置深度材质（阴影）
+   ↓
+5. 添加水面（物理材质）
+   ↓
+6. 实现颜色分层
+   ↓
+7. 添加边框（CSG）
+   ↓
+8. 优化和调试
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## P47
 
 
 

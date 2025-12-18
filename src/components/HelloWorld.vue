@@ -28,7 +28,12 @@ import * as CANNON from "cannon-es";
 import terrainVertexShader from "@/shaders/terrain/vertex.glsl";
 import terrainFragmentShader from "@/shaders/terrain/fragment.glsl";
 import gpgpuParticlesShader from "@/shaders/gpgpu/particles.glsl";
-import environmentMapsPath from "@/assets/textures/environmentMaps/spruit_sunrise.hdr";
+import pxEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/px.jpg";
+import nxEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/nx.jpg";
+import pyEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/py.jpg";
+import nyEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/ny.jpg";
+import pzEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/pz.jpg";
+import nzEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/nz.jpg";
 
 const sizes = {
   width: 800,
@@ -48,7 +53,7 @@ let renderer: THREE.WebGLRenderer | null = null;
 let controls: OrbitControls | null = null;
 const gui: GUI = new GUI();
 const meshArray: THREE.Mesh[] = [];
-const global = { envMapIntensity: 1 };
+const global = { envMapIntensity: 2.5 };
 let model: THREE.Group | null = null;
 
 // 2. 声明事件处理函数
@@ -109,15 +114,41 @@ loadingManager.onError = (url) => {
 
 const texturesLoader = new THREE.TextureLoader(loadingManager);
 const rgbeLoader = new RGBELoader();
+// 加载立方体贴图
+const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
+const environmentMap = cubeTextureLoader.load([
+  pxEnvironmentMapsPath,
+  nxEnvironmentMapsPath,
+  pyEnvironmentMapsPath,
+  nyEnvironmentMapsPath,
+  pzEnvironmentMapsPath,
+  nzEnvironmentMapsPath,
+]);
 
-// 1. 初始化 Draco 解码器
-const dracoLoader = new DRACOLoader();
-// 设置解码器路径（对应 public 下的资源）
-dracoLoader.setDecoderPath(`${import.meta.env.BASE_URL}draco/`); // 文件路径：/public/models/draco
-
-// 2. 关联到 GLTFLoader
+// 1. 初始化加载器
 const gltfLoader = new GLTFLoader();
-gltfLoader.setDRACOLoader(dracoLoader);
+
+// 2. 定义模型路径（支持 gltf/glb 等格式）
+const modelPath = `${
+  import.meta.env.BASE_URL
+}models/DamagedHelmet/glTF/DamagedHelmet.gltf`; // 文件路径：/public/models/Duck
+
+/**
+ * Update all materials
+ */
+const updateAllMaterials = (scene: THREE.Scene) => {
+  scene.traverse((child) => {
+    if (
+      child instanceof THREE.Mesh &&
+      child.material instanceof THREE.MeshStandardMaterial
+    ) {
+      child.material.envMapIntensity = global.envMapIntensity;
+      child.material.needsUpdate = true;
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+};
 
 onMounted(() => {
   // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
@@ -127,14 +158,9 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
-  // HDR (RGBE) equirectangular
-  rgbeLoader.load(environmentMapsPath, (environmentMap) => {
-    environmentMap.mapping = THREE.EquirectangularReflectionMapping;
-
-    scene.background = environmentMap;
-    scene.backgroundBlurriness = 0.5;
-    scene.environment = environmentMap;
-  });
+  // 设置为场景背景
+  scene.background = environmentMap;
+  scene.environment = environmentMap;
 
   // 创建渲染器对象
   const rendererParameters = { clearColor: "#29191f" };
@@ -144,172 +170,43 @@ onMounted(() => {
   renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1;
+  renderer.toneMapping = THREE.ReinhardToneMapping;
+  renderer.toneMappingExposure = 1.5;
 
   webgl.value!.appendChild(renderer.domElement);
 
   // 模型mesh==========================
-  /**
-   * Placeholder
-   */
-  const placeholder = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(2, 5),
-    new THREE.MeshPhysicalMaterial()
+  // 3. 执行加载
+  gltfLoader.load(
+    modelPath,
+    // 加载成功回调
+    (gltf) => {
+      gltf.scene.scale.set(2, 2, 2);
+      gltf.scene.rotation.y = Math.PI * 0.5;
+      scene.add(gltf.scene);
+
+      updateAllMaterials(scene);
+    },
+    // 加载进度回调
+    (xhr) => {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
+    // 加载错误回调
+    (error) => {
+      console.error("加载失败：", error);
+    }
   );
-  // scene.add(placeholder);
-
-  /**
-   * Terrain
-   */
-  // Geometry
-  const geometry = new THREE.PlaneGeometry(10, 10, 500, 500);
-  geometry.deleteAttribute("uv");
-  geometry.deleteAttribute("noraml");
-  geometry.rotateX(-Math.PI * 0.5);
-
-  // Material
-  const debugObject = {
-    colorWaterDeep: "#002b3d",
-    colorWaterSurface: "#66a8ff",
-    colorSand: "#ffe894",
-    colorGrass: "#85d534",
-    colorSnow: "#ffffff",
-    colorRock: "#bfbd8d",
-  };
-  const uniforms = {
-    uTime: new THREE.Uniform(0),
-
-    uPositionFrequency: new THREE.Uniform(0.2),
-    uStrength: new THREE.Uniform(2.0),
-    uWarpFrequency: new THREE.Uniform(5.0),
-    uWarpStrength: new THREE.Uniform(0.5),
-
-    uColorWaterDeep: new THREE.Uniform(
-      new THREE.Color(debugObject.colorWaterDeep)
-    ),
-    uColorWaterSurface: new THREE.Uniform(
-      new THREE.Color(debugObject.colorWaterSurface)
-    ),
-    uColorSand: new THREE.Uniform(new THREE.Color(debugObject.colorSand)),
-    uColorGrass: new THREE.Uniform(new THREE.Color(debugObject.colorGrass)),
-    uColorSnow: new THREE.Uniform(new THREE.Color(debugObject.colorSnow)),
-    uColorRock: new THREE.Uniform(new THREE.Color(debugObject.colorRock)),
-  };
-  gui
-    .add(uniforms.uPositionFrequency, "value", 0, 1, 0.001)
-    .name("uPositionFrequency");
-  gui.add(uniforms.uStrength, "value", 0, 10, 0.001).name("uStrength");
-  gui
-    .add(uniforms.uWarpFrequency, "value", 0, 10, 0.001)
-    .name("uWarpFrequency");
-  gui.add(uniforms.uWarpStrength, "value", 0, 1, 0.001).name("uWarpStrength");
-
-  gui
-    .addColor(debugObject, "colorWaterDeep")
-    .onChange(() =>
-      uniforms.uColorWaterDeep.value.set(debugObject.colorWaterDeep)
-    );
-  gui
-    .addColor(debugObject, "colorWaterSurface")
-    .onChange(() =>
-      uniforms.uColorWaterSurface.value.set(debugObject.colorWaterSurface)
-    );
-  gui
-    .addColor(debugObject, "colorSand")
-    .onChange(() => uniforms.uColorSand.value.set(debugObject.colorSand));
-  gui
-    .addColor(debugObject, "colorGrass")
-    .onChange(() => uniforms.uColorGrass.value.set(debugObject.colorGrass));
-  gui
-    .addColor(debugObject, "colorSnow")
-    .onChange(() => uniforms.uColorSnow.value.set(debugObject.colorSnow));
-  gui
-    .addColor(debugObject, "colorRock")
-    .onChange(() => uniforms.uColorRock.value.set(debugObject.colorRock));
-
-  const material = new CustomShaderMaterial({
-    //CSM
-    baseMaterial: THREE.MeshStandardMaterial,
-    vertexShader: terrainVertexShader,
-    fragmentShader: terrainFragmentShader,
-    uniforms,
-    silent: true,
-
-    // MeshStandarMaterial
-    metalness: 0,
-    roughness: 0.5,
-    color: "#85d534",
-  });
-  const depthMaterial = new CustomShaderMaterial({
-    //CSM
-    baseMaterial: THREE.MeshDepthMaterial,
-    vertexShader: terrainVertexShader,
-    uniforms,
-    silent: true,
-
-    // MeshDepthMaterial
-    depthPacking: THREE.RGBADepthPacking,
-  });
-
-  // Mesh
-  const terrain = new THREE.Mesh(geometry, material);
-  terrain.customDepthMaterial = depthMaterial;
-  terrain.castShadow = true;
-  terrain.receiveShadow = true;
-  scene.add(terrain);
-
-  /**
-   * Water
-   */
-  const water = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, 10, 1, 1),
-    new THREE.MeshPhysicalMaterial({
-      transmission: 1,
-      roughness: 0.3,
-    })
-  );
-  water.rotation.x = -Math.PI * 0.5;
-  water.position.y = -0.1;
-  scene.add(water);
-
-  /**
-   * Board
-   */
-  // Brushes
-  const boardFill = new Brush(new THREE.BoxGeometry(11, 2, 11));
-  const boardHole = new Brush(new THREE.BoxGeometry(10, 2.1, 10));
-  // boardHole.position.y = .2
-  // boardHole.updateMatrixWorld()
-
-  // Evaluate
-  const evaluator = new Evaluator();
-  const board = evaluator.evaluate(boardFill, boardHole, SUBTRACTION);
-  board.geometry.clearGroups();
-  board.material = new THREE.MeshStandardMaterial({
-    color: "#ffffff",
-    metalness: 0,
-    roughness: 0.3,
-  });
-  board.castShadow = true;
-  board.receiveShadow = true;
-  scene.add(board);
 
   /**
    * Lights
    */
-  const directionalLight = new THREE.DirectionalLight("#ffffff", 2);
-  directionalLight.position.set(6.25, 3, 4);
+  const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
   directionalLight.castShadow = true;
   directionalLight.shadow.mapSize.set(1024, 1024);
-  directionalLight.shadow.camera.near = 0.1;
-  directionalLight.shadow.camera.far = 30;
-  directionalLight.shadow.camera.top = 8;
-  directionalLight.shadow.camera.right = 8;
-  directionalLight.shadow.camera.bottom = -8;
-  directionalLight.shadow.camera.left = -8;
+  directionalLight.shadow.camera.far = 15;
+  directionalLight.shadow.normalBias = 0.05;
+  directionalLight.position.set(0.25, 3, -2.25);
   scene.add(directionalLight);
-
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(5); //创建一个坐标轴辅助对象
@@ -320,12 +217,12 @@ onMounted(() => {
    */
   // Base camera
   camera = new THREE.PerspectiveCamera(
-    35,
+    75,
     sizes.width / sizes.height,
     0.1,
     100
   );
-  camera.position.set(-10, 6, -2);
+  camera.position.set(4, 1, -4);
   scene.add(camera);
 
   // Controls
@@ -338,9 +235,6 @@ onMounted(() => {
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
-
-    // Uniforms
-    uniforms.uTime.value = elapsedTime;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});

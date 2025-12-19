@@ -38,13 +38,7 @@ import * as CANNON from "cannon-es";
 import terrainVertexShader from "@/shaders/terrain/vertex.glsl";
 import terrainFragmentShader from "@/shaders/terrain/fragment.glsl";
 import gpgpuParticlesShader from "@/shaders/gpgpu/particles.glsl";
-import pxEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/px.jpg";
-import nxEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/nx.jpg";
-import pyEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/py.jpg";
-import nyEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/ny.jpg";
-import pzEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/pz.jpg";
-import nzEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/nz.jpg";
-import interfaceNormalMapPath from "@/assets/textures/interfaceNormalMap.png";
+import displacementMapPath from "@/assets/textures/displacementMap.png";
 
 const sizes = {
   width: 800,
@@ -70,7 +64,7 @@ let model: THREE.Group | null = null;
 
 // 2. 声明事件处理函数
 const handleResize = () => {
-  if (!webgl.value || !camera || !renderer || !effectComposer) return;
+  if (!webgl.value || !camera || !renderer) return;
 
   // 更新容器尺寸
   const container = webgl.value;
@@ -87,10 +81,6 @@ const handleResize = () => {
   camera.updateProjectionMatrix();
   renderer.setSize(sizes.width, sizes.height);
   renderer.setPixelRatio(sizes.pixelRatio);
-
-  // Update renderer composer
-  effectComposer.setSize(sizes.width, sizes.height);
-  effectComposer.setPixelRatio(sizes.pixelRatio);
 
   // 更新控制器（如果存在）
   if (controls) controls.update();
@@ -130,24 +120,7 @@ loadingManager.onError = (url) => {
 
 const texturesLoader = new THREE.TextureLoader(loadingManager);
 const rgbeLoader = new RGBELoader();
-// 加载立方体贴图
-const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
-const environmentMap = cubeTextureLoader.load([
-  pxEnvironmentMapsPath,
-  nxEnvironmentMapsPath,
-  pyEnvironmentMapsPath,
-  nyEnvironmentMapsPath,
-  pzEnvironmentMapsPath,
-  nzEnvironmentMapsPath,
-]);
-
-// 1. 初始化加载器
-const gltfLoader = new GLTFLoader();
-
-// 2. 定义模型路径（支持 gltf/glb 等格式）
-const modelPath = `${
-  import.meta.env.BASE_URL
-}models/DamagedHelmet/glTF/DamagedHelmet.gltf`; // 文件路径：/public/models/Duck
+const displacementTexture = texturesLoader.load(displacementMapPath);
 
 /**
  * Update all materials
@@ -174,45 +147,60 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
-  // 设置为场景背景
-  scene.background = environmentMap;
-  scene.environment = environmentMap;
 
   // 创建渲染器对象
   const rendererParameters = { clearColor: "#29191f" };
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({
+    powerPreference: "high-performance",
+    antialias: true,
+  });
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(sizes.pixelRatio);
   renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  // renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.toneMapping = THREE.ReinhardToneMapping;
-  renderer.toneMappingExposure = 1.5;
 
   webgl.value!.appendChild(renderer.domElement);
 
   // 模型mesh==========================
-  // 3. 执行加载
-  gltfLoader.load(
-    modelPath,
-    // 加载成功回调
-    (gltf) => {
-      gltf.scene.scale.set(2, 2, 2);
-      gltf.scene.rotation.y = Math.PI * 0.5;
-      scene.add(gltf.scene);
-
-      updateAllMaterials(scene);
-    },
-    // 加载进度回调
-    (xhr) => {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    // 加载错误回调
-    (error) => {
-      console.error("加载失败：", error);
-    }
+  /**
+   * Test meshes
+   */
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 2, 2),
+    new THREE.MeshStandardMaterial()
   );
+  cube.castShadow = true;
+  cube.receiveShadow = true;
+  cube.position.set(-5, 0, 0);
+  scene.add(cube);
+
+  const torusKnot = new THREE.Mesh(
+    new THREE.TorusKnotGeometry(1, 0.4, 128, 32),
+    new THREE.MeshStandardMaterial()
+  );
+  torusKnot.castShadow = true;
+  torusKnot.receiveShadow = true;
+  scene.add(torusKnot);
+
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 32, 32),
+    new THREE.MeshStandardMaterial()
+  );
+  sphere.position.set(5, 0, 0);
+  sphere.castShadow = true;
+  sphere.receiveShadow = true;
+  scene.add(sphere);
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 10),
+    new THREE.MeshStandardMaterial()
+  );
+  floor.position.set(0, -2, 0);
+  floor.rotation.x = -Math.PI * 0.5;
+  floor.castShadow = true;
+  floor.receiveShadow = true;
+  scene.add(floor);
 
   /**
    * Lights
@@ -222,7 +210,7 @@ onMounted(() => {
   directionalLight.shadow.mapSize.set(1024, 1024);
   directionalLight.shadow.camera.far = 15;
   directionalLight.shadow.normalBias = 0.05;
-  directionalLight.position.set(0.25, 3, -2.25);
+  directionalLight.position.set(0.25, 3, 2.25);
   scene.add(directionalLight);
   // 模型mesh==========================
 
@@ -239,161 +227,12 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(4, 1, -4);
+  camera.position.set(2, 2, 6);
   scene.add(camera);
 
   // Controls
   controls = new OrbitControls(camera, webgl.value);
   controls.enableDamping = true;
-
-  /**
-   * Post processing
-   */
-  // Render target
-  const renderTarget = new THREE.WebGLRenderTarget(800, 600, {
-    samples: renderer.getPixelRatio() === 1 ? 2 : 0,
-  });
-  effectComposer = new EffectComposer(renderer, renderTarget);
-  effectComposer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
-  effectComposer.setPixelRatio(sizes.pixelRatio);
-
-  const renderPass = new RenderPass(scene, camera);
-  effectComposer.addPass(renderPass);
-
-  // 报纸特效
-  const dotScreenPass = new DotScreenPass();
-  dotScreenPass.enabled = false;
-  effectComposer.addPass(dotScreenPass);
-
-  // 电脑入侵特效
-  const glitchPass = new GlitchPass();
-  glitchPass.goWild = false;
-  glitchPass.enabled = false;
-  effectComposer.addPass(glitchPass);
-
-  // 炫光特效
-  const rgbShiftPass = new ShaderPass(RGBShiftShader);
-  rgbShiftPass.enabled = false;
-  effectComposer.addPass(rgbShiftPass);
-
-  // 天堂光
-  // strength 光强
-  // radius 光范围
-  // threshold 最小值
-  const unrealBloomPass = new UnrealBloomPass();
-  unrealBloomPass.strength = 0.3;
-  unrealBloomPass.radius = 1;
-  unrealBloomPass.threshold = 0.6;
-  effectComposer.addPass(unrealBloomPass);
-  gui.add(unrealBloomPass, "enabled");
-  gui.add(unrealBloomPass, "strength", 0, 2, 0.001);
-  gui.add(unrealBloomPass, "radius", 0, 2, 0.001);
-  gui.add(unrealBloomPass, "threshold", 0, 1, 0.001);
-
-  // Tint pass 色调
-  const TintShader = {
-    uniforms: {
-      tDiffuse: { value: null },
-      uTint: { value: null },
-    },
-    vertexShader: `
-      varying vec2 vUv;
-
-      void main(){
-        gl_Position = projectionMatrix *modelViewMatrix * vec4 (position,1);
-
-        vUv = uv;
-      }
-    `,
-    fragmentShader: `
-      uniform sampler2D tDiffuse;
-      uniform vec3 uTint;
-
-      varying vec2 vUv;
-
-      void main(){
-        vec4 color = texture2D(tDiffuse, vUv);
-        color.rgb += uTint;
-        // color.b += .1;
-        gl_FragColor = color;
-      }
-    `,
-  };
-  const tintPass = new ShaderPass(TintShader);
-  tintPass.material.uniforms.uTint.value = new THREE.Vector3();
-  effectComposer.addPass(tintPass);
-  gui
-    .add(tintPass.material.uniforms.uTint.value, "x", -1, 1, 0.001)
-    .name("red");
-  gui
-    .add(tintPass.material.uniforms.uTint.value, "y", -1, 1, 0.001)
-    .name("green");
-  gui
-    .add(tintPass.material.uniforms.uTint.value, "z", -1, 1, 0.001)
-    .name("blue");
-
-  // Displacement pass 自定义后期处理
-  const DisplacementShader = {
-    uniforms: {
-      tDiffuse: { value: null },
-      uTime: { value: null },
-      uNormalMap: { value: null },
-    },
-    vertexShader: `
-      varying vec2 vUv;
-
-      void main(){
-        gl_Position = projectionMatrix *modelViewMatrix * vec4 (position,1);
-
-        vUv = uv;
-      }
-    `,
-    fragmentShader: `
-      uniform sampler2D tDiffuse;
-      uniform float uTime;
-      uniform sampler2D uNormalMap;
-
-      varying vec2 vUv;
-
-      void main(){
-        // vec2 newUv = vUv;
-        // newUv.y += .5;
-
-        // vec2 newUv = vec2(
-        //   vUv.x,
-        //   vUv.y + sin(vUv.x * 10.0 + uTime) * .1
-        // );
-
-        vec3 normalColor = texture2D(uNormalMap, vUv).xyz * 2.0 - 1.0;
-        vec2 newUv = vUv + normalColor.xy * .1;
-
-        vec4 color = texture2D(tDiffuse, newUv);
-
-        vec3 lightDirection = normalize(vec3(-1.0,1.0,.0));
-        float lightness = clamp(dot(normalColor, lightDirection), .0, 1.0);
-        color.rgb += lightness * 2.0;
-
-        gl_FragColor = color;
-      }
-    `,
-  };
-  const displacementPass = new ShaderPass(DisplacementShader);
-  displacementPass.material.uniforms.uTime.value = 0;
-  displacementPass.material.uniforms.uNormalMap.value = texturesLoader.load(
-    interfaceNormalMapPath
-  );
-  effectComposer.addPass(displacementPass);
-
-  // SMAA pass
-  if (renderer.getPixelRatio() === 1 && !renderer.capabilities.isWebGL2) {
-    const smaaPass = new SMAAPass();
-    effectComposer.addPass(smaaPass);
-    console.log("Using SMAA");
-  }
-
-  // Gamma Correction pass  伽马校正，没有这个画面会暗
-  const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
-  effectComposer.addPass(gammaCorrectionPass);
 
   const clock = new THREE.Clock(); //创建一个时钟对象，用于计算时间差
   function render() {
@@ -402,8 +241,8 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
-    // Update passes
-    displacementPass.material.uniforms.uTime.value = elapsedTime;
+    // Update test mesh
+    torusKnot.rotation.y = elapsedTime * 0.1;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -411,8 +250,7 @@ onMounted(() => {
     // Update controls
     controls.update();
 
-    // renderer.render(scene, camera); //执行渲染操作
-    effectComposer.render();
+    renderer.render(scene, camera); //执行渲染操作
     requestAnimationFrame(render); //请求再次执行函数render
   }
   render();

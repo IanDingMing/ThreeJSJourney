@@ -4355,7 +4355,7 @@ strength值:                0.0→1.0平滑过渡
 
 ### 八、课程技术演进总结
 
-![GPGPU粒子船流体模拟课程思路]()
+![GPGPU粒子船流体模拟课程思路](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-2/GPGPU粒子船流体模拟课程思路.png)
 
 #### **阶段演进路径**
 
@@ -5214,6 +5214,422 @@ text
 
 
 
+## P47 Post processing 后期处理
+
+### 一、核心概念
+
+#### 1. 什么是后期处理
+
+- **定义**：在场景渲染完成后，对渲染图像进行二次处理的技术
+- **类比**：类似Photoshop的滤镜效果，在3D渲染后应用
+- **优势**：高性能、可组合、实时调整
+
+#### 2. 核心组件[EffectComposer](http://www.yanhuangxueyuan.com/threejs/docs/index.html?q=EffectComposer#examples/en/postprocessing/EffectComposer)
+
+javascript
+
+```
+EffectComposer  // 效果合成器（核心控制器）
+RenderPass      // 渲染通道（基础渲染）
+ShaderPass      // 着色器通道（自定义效果）
+其他效果Pass    // 各种内置效果通道
+```
+
+
+
+### 二、基础设置流程
+
+#### 1. 创建EffectComposer
+
+javascript
+
+```
+// 步骤1：创建效果合成器
+effectComposer = new EffectComposer(renderer);
+
+// 步骤2：设置尺寸
+effectComposer.setSize(sizes.width, sizes.height);
+effectComposer.setPixelRatio(sizes.pixelRatio);
+```
+
+[使用RenderTarget改善锯齿问题](#使用RenderTarget改善锯齿问题)
+
+
+
+#### 2. 添加基础渲染通道
+
+javascript
+
+```
+const renderPass = new RenderPass(scene, camera);
+effectComposer.addPass(renderPass);
+```
+
+
+
+#### 3. 渲染循环
+
+javascript
+
+```
+// 替换原来的 renderer.render(scene, camera)
+effectComposer.render();
+```
+
+
+
+### 三、常用后期处理效果
+
+#### 1. 点阵效果 (DotScreen)
+
+javascript
+
+```
+import { DotScreenPass } from 'three/examples/jsm/postprocessing/DotScreenPass.js';
+
+const dotScreenPass = new DotScreenPass();
+dotScreenPass.enabled = false;  // 默认关闭
+effectComposer.addPass(dotScreenPass);
+```
+
+
+
+#### 2. 故障效果 (Glitch)
+
+javascript
+
+```
+import { GlitchPass } from 'three/examples/jsm/postprocessing/GlitchPass.js';
+
+const glitchPass = new GlitchPass();
+glitchPass.goWild = false;  // 是否狂暴模式
+glitchPass.enabled = false;
+effectComposer.addPass(glitchPass);
+```
+
+
+
+#### 3. RGB位移效果 (RGB Shift)
+
+javascript
+
+```
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { RGBShiftShader } from 'three/examples/jsm/shaders/RGBShiftShader.js';
+
+const rgbShiftPass = new ShaderPass(RGBShiftShader);
+rgbShiftPass.enabled = false;
+effectComposer.addPass(rgbShiftPass);
+```
+
+
+
+#### 4. 泛光效果 (Bloom)
+
+javascript
+
+```
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(width, height),  // 分辨率
+  strength,    // 强度 (0-2)
+  radius,      // 半径 (0-2)
+  threshold    // 阈值 (0-1)
+);
+
+effectComposer.addPass(bloomPass);
+```
+
+
+
+#### 5. 伽马校正
+
+javascript
+
+```
+import { GammaCorrectionShader } from 'three/examples/jsm/shaders/GammaCorrectionShader.js';
+
+const gammaPass = new ShaderPass(GammaCorrectionShader);
+effectComposer.addPass(gammaPass);
+```
+
+
+
+### 四、自定义后期处理效果
+
+#### 1. 创建自定义着色器
+
+javascript
+
+```
+const CustomShader = {
+  uniforms: {
+    tDiffuse: { value: null },     // 输入纹理
+    uTime: { value: 0 },           // 时间
+    uTint: { value: new THREE.Vector3() }  // 自定义参数
+  },
+  
+  vertexShader: `
+    varying vec2 vUv;
+    
+    void main() {
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      vUv = uv;
+    }
+  `,
+  
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec3 uTint;
+    uniform float uTime;
+    
+    varying vec2 vUv;
+    
+    void main() {
+      vec4 color = texture2D(tDiffuse, vUv);
+      color.rgb += uTint;  // 应用色调
+      
+      // 添加动态效果
+      color.rgb *= sin(uTime * 2.0) * 0.1 + 0.9;
+      
+      gl_FragColor = color;
+    }
+  `
+};
+```
+
+
+
+#### 2. 使用自定义着色器
+
+javascript
+
+```
+const customPass = new ShaderPass(CustomShader);
+customPass.material.uniforms.uTime.value = 0;
+effectComposer.addPass(customPass);
+
+// 在动画循环中更新时间
+function animate() {
+  const elapsedTime = clock.getElapsedTime();
+  customPass.material.uniforms.uTime.value = elapsedTime;
+}
+```
+
+
+
+### 五、抗锯齿处理方案
+
+[各种抗锯齿技术的区别](#各种抗锯齿技术的区别)
+
+#### 1. 多重采样抗锯齿 (MSAA)
+
+javascript
+
+```
+// 在WebGLRenderer中启用
+const renderer = new THREE.WebGLRenderer({ 
+  antialias: true 
+});
+
+// 在RenderTarget中设置采样数
+const renderTarget = new THREE.WebGLRenderTarget(width, height, {
+  samples: 4  // 采样数越高效果越好，性能越低
+});
+```
+
+
+
+#### 2. 后期处理抗锯齿 (SMAA)
+
+[WebGL 2.0浏览器版本兼容信息](https://caniuse.com/webgl2)
+
+javascript
+
+```
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
+
+// 在设备像素比为1且不支持WebGL2时使用
+if (renderer.getPixelRatio() === 1 && !renderer.capabilities.isWebGL2) {
+  const smaaPass = new SMAAPass();
+  effectComposer.addPass(smaaPass);
+}
+```
+
+
+
+#### 3. 像素比策略
+
+javascript
+
+```
+// 高分屏（Retina）通常不需要额外抗锯齿
+const pixelRatio = Math.min(window.devicePixelRatio, 2);
+const needsAntialiasing = pixelRatio === 1;  // 普通屏幕需要抗锯齿
+```
+
+[为什么pixelRatio大于1时不需要抗锯齿？](#为什么pixelRatio大于1时不需要抗锯齿？)
+
+### 六、性能优化技巧
+
+#### 1. 合理启用/禁用效果
+
+javascript
+
+```
+// 动态控制效果开关
+const effects = {
+  bloom: { pass: bloomPass, enabled: false },
+  glitch: { pass: glitchPass, enabled: false }
+};
+
+// 根据场景需要启用
+function enableEffect(name, enabled) {
+  effects[name].pass.enabled = enabled;
+  effects[name].enabled = enabled;
+}
+```
+
+
+
+#### 2. 分辨率优化
+
+javascript
+
+```
+// 根据性能调整分辨率
+function setEffectResolution(scale = 1) {
+  const width = sizes.width * scale;
+  const height = sizes.height * scale;
+  
+  effectComposer.setSize(width, height);
+}
+```
+
+
+
+#### 3. 各类型 Pass 的正确顺序
+
+**核心原则：先处理内容，再处理显示**
+
+text
+
+```
+渲染顺序很重要：
+1. RenderPass（必须第一个）
+2. 色彩/色调调整（色调、饱和度、对比度）
+3. 几何/位移效果（扭曲、波纹、位移）
+4. 模糊/发光类（Bloom、景深、运动模糊）
+5. 风格化效果（点阵、故障、素描）
+6. 抗锯齿（SMAA、FXAA）
+7. 伽马校正（Gamma Correction）
+8. 色调映射（Tone Mapping）*
+```
+
+> *注：色调映射有时在渲染器中设置，有时作为单独的Pass
+
+### 七、常见问题与解决方案
+
+#### 1. 窗口大小变化模糊
+
+**问题**：改变窗口大小后图像变模糊
+**原因**：EffectComposer的渲染目标尺寸未更新
+**解决**：
+
+javascript
+
+```
+function handleResize() {
+  // 更新所有尺寸相关对象
+  camera.aspect = sizes.width / sizes.height;
+  camera.updateProjectionMatrix();
+  
+  renderer.setSize(sizes.width, sizes.height);
+  renderer.setPixelRatio(sizes.pixelRatio);
+  
+  effectComposer.setSize(sizes.width, sizes.height);
+  effectComposer.setPixelRatio(sizes.pixelRatio);
+}
+```
+
+
+
+#### 2. 性能下降
+
+**解决**：
+
+- 减少RenderTarget的samples数量
+- 降低Bloom等效果的分辨率
+- 按需启用效果（不是所有效果都需要一直开启）
+- 使用更简单的着色器
+
+#### 3. 效果叠加问题
+
+**解决**：调整Pass顺序，注意每个Pass对上一个Pass结果的影响
+
+
+
+### 八、实战示例代码结构
+
+javascript
+
+```
+// 1. 导入依赖
+import { EffectComposer, RenderPass } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+
+// 2. 初始化
+let composer;
+let bloomPass;
+
+function initPostProcessing() {
+  // 创建效果合成器
+  const renderTarget = new THREE.WebGLRenderTarget(
+    window.innerWidth, 
+    window.innerHeight,
+    { samples: 2 }
+  );
+  
+  composer = new EffectComposer(renderer, renderTarget);
+  
+  // 添加基础渲染通道
+  const renderPass = new RenderPass(scene, camera);
+  composer.addPass(renderPass);
+  
+  // 添加泛光效果
+  bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    1.5,  // strength
+    0.4,  // radius
+    0.85  // threshold
+  );
+  composer.addPass(bloomPass);
+  
+  // 设置尺寸
+  composer.setSize(window.innerWidth, window.innerHeight);
+  composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+}
+
+// 3. 动画循环
+function animate() {
+  // ... 更新场景
+  
+  // 渲染后期处理
+  composer.render();
+  
+  requestAnimationFrame(animate);
+}
+
+// 4. 窗口大小调整
+window.addEventListener('resize', () => {
+  // ... 更新相机和渲染器
+  
+  composer.setSize(window.innerWidth, window.innerHeight);
+  composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+});
+```
 
 
 
@@ -5232,7 +5648,10 @@ text
 
 
 
-## P47
+
+
+
+## P48
 
 
 
@@ -6193,6 +6612,112 @@ x:     -1.0  -0.75  -0.5   0.0   0.5   0.75   1.0
 1. **中间区域被拉伸**：[-0.5, 0.5] → [0.156, 0.844]
 2. **两端区域被压缩**：边界附近的值被推向0或1
 3. **整体分布更均匀**：减少了中间聚集现象
+
+------
+
+
+
+## 使用RenderTarget改善锯齿问题
+
+**原理：**
+`WebGLRenderTarget`可以创建一个离屏渲染缓冲区，可以：
+
+1. **设置多重采样抗锯齿（MSAA）：**
+
+   javascript
+
+   ```
+   // 步骤1：创建渲染目标
+   const renderTarget = new THREE.WebGLRenderTarget(800, 600, {
+     samples: renderer.getPixelRatio() === 1 ? 2 : 0, // 普通屏幕使用2倍采样
+   });
+   
+   // 步骤2：创建效果合成器
+   effectComposer = new EffectComposer(renderer, renderTarget);
+   
+   // 步骤3：设置尺寸
+   effectComposer.setSize(sizes.width, sizes.height);
+   effectComposer.setPixelRatio(sizes.pixelRatio);
+   ```
+
+   
+
+2. **为后期处理链提供中间缓冲**
+
+   - 每个处理pass都能在前一个pass的输出上操作
+   - 避免直接渲染到屏幕带来的限制
+
+------
+
+
+
+## 各种抗锯齿技术的区别
+
+#### **SSAA (超级采样抗锯齿)**
+
+- **原理**：以更高分辨率渲染，然后下采样
+- **效果**：最好
+- **性能**：最差（4x SSAA需要4倍像素计算）
+- **适用**：静态场景，对质量要求极高
+
+#### **MSAA (多重采样抗锯齿)**
+
+- **原理**：仅在边缘进行多重采样
+- **效果**：很好
+- **性能**：中等
+- **适用**：Three.js默认支持，硬件加速
+
+#### **FXAA (快速近似抗锯齿)**
+
+- **原理**：基于后处理的边缘检测和模糊
+- **效果**：一般，可能会使纹理变模糊
+- **性能**：很好
+- **适用**：移动端，性能敏感场景
+
+#### **SMAA (增强型子像素形态学抗锯齿)**
+
+- **原理**：结合模式检测和形态学滤波
+- **效果**：比FXAA更好，更少模糊
+- **性能**：较好
+- **适用**：平衡质量和性能
+
+#### **TAA (时间性抗锯齿)**
+
+- **原理**：利用多帧信息进行累积
+- **效果**：优秀，能减少闪烁
+- **性能**：中等
+- **缺点**：可能导致运动模糊和重影
+
+------
+
+
+
+## 为什么pixelRatio大于1时不需要抗锯齿？
+
+**物理原理：**
+
+- **devicePixelRatio > 1**：表示设备是"Retina"或高DPI屏幕
+  - 例如：devicePixelRatio = 2 表示1个CSS像素对应4个物理像素
+- **像素密度足够高**：锯齿在人眼感知中已不明显
+
+**技术实现：**
+
+javascript
+
+```
+// 代码中的逻辑
+samples: renderer.getPixelRatio() === 1 ? 2 : 0
+// 解释：
+// - pixelRatio = 1: 普通屏幕，开启MSAA(2x)
+// - pixelRatio > 1: 高分屏，关闭MSAA（已足够清晰）
+```
+
+
+
+**性能考虑：**
+
+1. **高分屏**：渲染分辨率已经翻倍，再开抗锯齿性能开销大
+2. **普通屏**：像素密度低，需要抗锯齿提升视觉质量
 
 ------
 

@@ -4631,6 +4631,10 @@ Three.js 的`layers`本质是 **“渲染过滤器”**：
 
 两者互不干扰，既保留了静态环境的真实感，又实现了动态灯光的反射效果，且不会出现 “反射到自己” 的错误。
 
+![Snipaste_2025-10-02_22-49-35](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Snipaste_2025-10-02_22-49-35.png)
+
+![Snipaste_2025-10-02_22-51-47](/Users/macbook/projects/threeJs-learn/ThreeJS Journey/ThreeJSJourney/note/images-1/Snipaste_2025-10-02_22-51-47.png)
+
 ### 一句话总结
 
 用图层让`CubeCamera`只渲染环状灯光，是为了 **“精准控制动态环境贴图的内容”**—— 只包含我们需要的灯光信息，排除其他干扰物体，让反射效果更符合预期。

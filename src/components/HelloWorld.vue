@@ -40,7 +40,12 @@ import * as CANNON from "cannon-es";
 import terrainVertexShader from "@/shaders/terrain/vertex.glsl";
 import terrainFragmentShader from "@/shaders/terrain/fragment.glsl";
 import gpgpuParticlesShader from "@/shaders/gpgpu/particles.glsl";
-import displacementMapPath from "@/assets/textures/displacementMap.png";
+import pxEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/px.jpg";
+import nxEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/nx.jpg";
+import pyEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/py.jpg";
+import nyEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/ny.jpg";
+import pzEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/pz.jpg";
+import nzEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/nz.jpg";
 
 /**
  * Stats
@@ -129,7 +134,24 @@ loadingManager.onError = (url) => {
 
 const texturesLoader = new THREE.TextureLoader(loadingManager);
 const rgbeLoader = new RGBELoader();
-const displacementTexture = texturesLoader.load(displacementMapPath);
+// 加载立方体贴图
+const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
+const environmentMap = cubeTextureLoader.load([
+  pxEnvironmentMapsPath,
+  nxEnvironmentMapsPath,
+  pyEnvironmentMapsPath,
+  nyEnvironmentMapsPath,
+  pzEnvironmentMapsPath,
+  nzEnvironmentMapsPath,
+]);
+environmentMap.colorSpace = THREE.SRGBColorSpace;
+// 1. 初始化加载器
+const gltfLoader = new GLTFLoader();
+
+// 2. 定义模型路径（支持 gltf/glb 等格式）
+const modelPath = `${
+  import.meta.env.BASE_URL
+}models/FlightHelmet/glTF/FlightHelmet.gltf`; // 文件路径：/public/models/Duck
 
 /**
  * Update all materials
@@ -156,6 +178,8 @@ onMounted(() => {
   // 创建3D场景对象Scene
   const scene = new THREE.Scene();
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
+  scene.background = environmentMap;
+  scene.environment = environmentMap;
 
   // 创建渲染器对象
   const rendererParameters = { clearColor: "#29191f" };
@@ -168,59 +192,43 @@ onMounted(() => {
   renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ReinhardToneMapping;
+  renderer.toneMappingExposure = 3;
 
   webgl.value!.appendChild(renderer.domElement);
 
   // 模型mesh==========================
-  /**
-   * Test meshes
-   */
-  const cube = new THREE.Mesh(
-    new THREE.BoxGeometry(2, 2, 2),
-    new THREE.MeshStandardMaterial()
-  );
-  cube.castShadow = true;
-  cube.receiveShadow = true;
-  cube.position.set(-5, 0, 0);
-  // scene.add(cube);
+  // 3. 执行加载
+  gltfLoader.load(
+    modelPath,
+    // 加载成功回调
+    (gltf) => {
+      gltf.scene.scale.set(10, 10, 10);
+      gltf.scene.position.set(0, -4, 0);
+      gltf.scene.rotation.y = Math.PI * 0.5;
+      scene.add(gltf.scene);
 
-  const torusKnot = new THREE.Mesh(
-    new THREE.TorusKnotGeometry(1, 0.4, 128, 32),
-    new THREE.MeshStandardMaterial()
+      updateAllMaterials(scene);
+    },
+    // 加载进度回调
+    (xhr) => {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
+    // 加载错误回调
+    (error) => {
+      console.error("加载失败：", error);
+    }
   );
-  torusKnot.castShadow = true;
-  torusKnot.receiveShadow = true;
-  // scene.add(torusKnot);
-
-  const sphere = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 32, 32),
-    new THREE.MeshStandardMaterial()
-  );
-  sphere.position.set(5, 0, 0);
-  sphere.castShadow = true;
-  sphere.receiveShadow = true;
-  // scene.add(sphere);
-
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, 10),
-    new THREE.MeshStandardMaterial()
-  );
-  floor.position.set(0, -2, 0);
-  floor.rotation.x = -Math.PI * 0.5;
-  floor.castShadow = true;
-  floor.receiveShadow = true;
-  // scene.add(floor);
-
   /**
    * Lights
    */
   const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
   directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.set(1024, 1024);
   directionalLight.shadow.camera.far = 15;
+  directionalLight.shadow.mapSize.set(1024, 1024);
   directionalLight.shadow.normalBias = 0.05;
-  directionalLight.position.set(0.25, 3, 2.25);
-  // scene.add(directionalLight);
+  directionalLight.position.set(0.25, 3, -2.25);
+  scene.add(directionalLight);
   // 模型mesh==========================
 
   const axesHelper = new THREE.AxesHelper(5); //创建一个坐标轴辅助对象
@@ -236,7 +244,7 @@ onMounted(() => {
     0.1,
     100
   );
-  camera.position.set(2, 2, 6);
+  camera.position.set(4, 1, -4);
   scene.add(camera);
 
   // Controls
@@ -251,9 +259,6 @@ onMounted(() => {
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
 
-    // Update test mesh
-    torusKnot.rotation.y = elapsedTime * 0.1;
-
     // Animate meshes
     meshArray.forEach((mesh) => {});
 
@@ -265,225 +270,6 @@ onMounted(() => {
     stats.end();
   }
   render();
-
-  /**
-   * Tips
-   */
-
-  // // Tip 4
-  // console.log(renderer.info)
-
-  // // Tip 6
-  // scene.remove(cube)
-  // cube.geometry.dispose()
-  // cube.material.dispose()
-
-  // // Tip 10
-  // directionalLight.shadow.camera.top = 3
-  // directionalLight.shadow.camera.right = 6
-  // directionalLight.shadow.camera.left = - 6
-  // directionalLight.shadow.camera.bottom = - 3
-  // directionalLight.shadow.camera.far = 10
-  // directionalLight.shadow.mapSize.set(1024, 1024)
-
-  // const cameraHelper = new THREE.CameraHelper(directionalLight.shadow.camera)
-  // scene.add(cameraHelper)
-
-  // // Tip 11
-  // cube.castShadow = true
-  // cube.receiveShadow = false
-
-  // torusKnot.castShadow = true
-  // torusKnot.receiveShadow = false
-
-  // sphere.castShadow = true
-  // sphere.receiveShadow = false
-
-  // floor.castShadow = false
-  // floor.receiveShadow = true
-
-  // // Tip 12
-  // renderer.shadowMap.autoUpdate = false
-  // renderer.shadowMap.needsUpdate = true
-
-  // // Tip 18
-  // const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5)
-  // const material = new THREE.MeshNormalMaterial()
-
-  // for(let i = 0; i < 50; i++)
-  // {
-  //     const mesh = new THREE.Mesh(geometry, material)
-  //     mesh.position.x = (Math.random() - 0.5) * 10
-  //     mesh.position.y = (Math.random() - 0.5) * 10
-  //     mesh.position.z = (Math.random() - 0.5) * 10
-  //     mesh.rotation.x = (Math.random() - 0.5) * Math.PI * 2
-  //     mesh.rotation.y = (Math.random() - 0.5) * Math.PI * 2
-
-  //     scene.add(mesh)
-  // }
-
-  // // Tip 19
-  // const geometries = []
-
-  // for(let i = 0; i < 50; i++)
-  // {
-  //     const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5)
-
-  //     geometry.rotateX((Math.random() - 0.5) * Math.PI * 2)
-  //     geometry.rotateY((Math.random() - 0.5) * Math.PI * 2)
-
-  //     geometry.translate(
-  //         (Math.random() - 0.5) * 10,
-  //         (Math.random() - 0.5) * 10,
-  //         (Math.random() - 0.5) * 10
-  //     )
-
-  //     geometries.push(geometry)
-  // }
-
-  // const mergedGeometry = BufferGeometryUtils.mergeBufferGeometries(geometries)
-  // const material = new THREE.MeshNormalMaterial()
-  // const mesh = new THREE.Mesh(mergedGeometry, material)
-  // scene.add(mesh)
-
-  // // Tip 22
-  // const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5)
-  // const material = new THREE.MeshNormalMaterial()
-
-  // const mesh = new THREE.InstancedMesh(geometry, material, 50)
-  // mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-  // scene.add(mesh)
-
-  // for(let i = 0; i < 50; i++)
-  // {
-  //     const position = new THREE.Vector3(
-  //         (Math.random() - 0.5) * 10,
-  //         (Math.random() - 0.5) * 10,
-  //         (Math.random() - 0.5) * 10
-  //     )
-
-  //     const quaternion = new THREE.Quaternion()
-  //     quaternion.setFromEuler(new THREE.Euler(
-  //         (Math.random() - 0.5) * Math.PI * 2,
-  //         (Math.random() - 0.5) * Math.PI * 2,
-  //         0
-  //     ))
-
-  //     const matrix = new THREE.Matrix4()
-  //     matrix.makeRotationFromQuaternion(quaternion)
-  //     matrix.setPosition(position)
-  //     mesh.setMatrixAt(i, matrix)
-  // }
-
-  // // Tip 29
-  // renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-
-  // // Tip 31, 32, 34 and 35
-  // const shaderGeometry = new THREE.PlaneGeometry(10, 10, 256, 256)
-
-  // const shaderMaterial = new THREE.ShaderMaterial({
-  //     uniforms:
-  //     {
-  //         uDisplacementTexture: { value: displacementTexture },
-  //         uDisplacementStrength: { value: 1.5 }
-  //     },
-  //     vertexShader: `
-  //         uniform sampler2D uDisplacementTexture;
-  //         uniform float uDisplacementStrength;
-
-  //         varying vec2 vUv;
-
-  //         void main()
-  //         {
-  //             vec4 modelPosition = modelMatrix * vec4(position, 1.0);
-
-  //             float elevation = texture2D(uDisplacementTexture, uv).r;
-  //             if(elevation < 0.5)
-  //             {
-  //                 elevation = 0.5;
-  //             }
-
-  //             modelPosition.y += elevation * uDisplacementStrength;
-
-  //             gl_Position = projectionMatrix * viewMatrix * modelPosition;
-
-  //             vUv = uv;
-  //         }
-  //     `,
-  //     fragmentShader: `
-  //         uniform sampler2D uDisplacementTexture;
-
-  //         varying vec2 vUv;
-
-  //         void main()
-  //         {
-  //             float elevation = texture2D(uDisplacementTexture, vUv).r;
-  //             if(elevation < 0.25)
-  //             {
-  //                 elevation = 0.25;
-  //             }
-
-  //             vec3 depthColor = vec3(1.0, 0.1, 0.1);
-  //             vec3 surfaceColor = vec3(0.1, 0.0, 0.5);
-  //             vec3 finalColor = vec3(0.0);
-  //             finalColor.r += depthColor.r + (surfaceColor.r - depthColor.r) * elevation;
-  //             finalColor.g += depthColor.g + (surfaceColor.g - depthColor.g) * elevation;
-  //             finalColor.b += depthColor.b + (surfaceColor.b - depthColor.b) * elevation;
-
-  //             gl_FragColor = vec4(finalColor, 1.0);
-  //         }
-  //     `
-  // })
-
-  // const shaderMesh = new THREE.Mesh(shaderGeometry, shaderMaterial)
-  // shaderMesh.rotation.x = - Math.PI * 0.5
-  // scene.add(shaderMesh)
-
-  // Tip 31, 32, 34 and 35 new
-  const shaderGeometry = new THREE.PlaneGeometry(10, 10, 256, 256);
-
-  const shaderMaterial = new THREE.ShaderMaterial({
-    precision: "lowp",
-    uniforms: {
-      uDisplacementTexture: { value: displacementTexture },
-    },
-    defines: {
-      DISPLACMENT_STRENGH: 1.5,
-    },
-    vertexShader: `
-        uniform sampler2D uDisplacementTexture;
-
-        varying vec3 vColor;
-
-        void main()
-        {
-            // Position
-            vec4 modelPosition = modelMatrix * vec4(position, 1.0);
-            float elevation = texture2D(uDisplacementTexture, uv).r;
-            modelPosition.y += max(elevation, 0.5) * DISPLACMENT_STRENGH;
-            gl_Position = projectionMatrix * viewMatrix * modelPosition;
-
-            // Color
-            float colorElevation = max(elevation, 0.25);
-            vec3 color = mix(vec3(1.0, 0.1, 0.1), vec3(0.1, 0.0, 0.5), colorElevation);
-
-            // Varying
-            vColor = color;
-        }
-    `,
-    fragmentShader: `
-        varying vec3 vColor;
-
-        void main()
-        {
-            gl_FragColor = vec4(vColor, 1.0);
-        }
-    `,
-  });
-
-  const shaderMesh = new THREE.Mesh(shaderGeometry, shaderMaterial);
-  shaderMesh.rotation.x = -Math.PI * 0.5;
-  scene.add(shaderMesh);
 
   // 添加事件监听
   window.addEventListener("resize", handleResize);

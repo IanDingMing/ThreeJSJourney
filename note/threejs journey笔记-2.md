@@ -5635,6 +5635,484 @@ window.addEventListener('resize', () => {
 
 
 
+## P48 Performance Tips 性能测试
+
+### 一、性能监控工具：[stats.js](https://www.npmjs.com/package/stats.js)
+
+#### 什么是stats.js？
+
+stats.js 是一个轻量级的 JavaScript 性能监控库，专门用于在网页中显示实时性能数据。它通常用于监控 Three.js 等 WebGL 应用的帧率（FPS）和性能指标。
+
+#### 如何使用？
+
+javascript
+
+```
+// 安装
+npm install stats.js
+
+// 在代码中使用
+import Stats from 'stats.js';
+
+// 创建实例
+const stats = new Stats();
+
+// 选择显示面板（0: fps, 1: ms, 2: mb）
+stats.showPanel(0);
+
+// 添加到页面
+document.body.appendChild(stats.dom);
+
+// 在渲染循环中调用
+function animate() {
+    stats.begin();  // 开始测量
+    // 渲染代码...
+    renderer.render(scene, camera);
+    stats.end();    // 结束测量
+    requestAnimationFrame(animate);
+}
+```
+
+
+
+#### 显示的面板类型：
+
+- **面板0**：FPS（帧率）- 绿色表示60FPS以上，黄色表示30-60FPS，红色表示低于30FPS
+- **面板1**：MS（渲染一帧所需毫秒数）
+- **面板2**：MB（内存使用情况）
+
+------
+
+### 二、Chrome 性能调试命令
+
+#### 命令解释：
+
+bash
+
+```
+open -a 'Google Chrome' --args --disable-gpu-vsync --disable-frame-rate-limit
+```
+
+
+
+#### 参数含义：
+
+- `--disable-gpu-vsync`：禁用垂直同步，允许帧率超过显示器的刷新率
+- `--disable-frame-rate-limit`：禁用Chrome的帧率限制（通常是60FPS）
+
+#### 使用后果：
+
+1. **正面效果**：
+   - 可以测试应用在更高帧率下的表现
+   - 便于性能基准测试和压力测试
+   - 更容易发现性能瓶颈
+2. **负面效果**：
+   - 可能导致GPU过热
+   - 增加电池消耗（笔记本）
+   - 可能造成画面撕裂（无垂直同步）
+   - 仅供开发调试使用，用户不应使用此模式
+
+#### 使用场景：
+
+- 性能优化时测试最大帧率
+- 检测高负载场景下的性能表现
+- 调试渲染性能问题
+
+------
+
+### 三、Spector.js WebGL 调试工具
+
+#### 为什么输出信息看不懂？
+
+Spector.js 输出的 WebGL 命令流非常详细，包含：
+
+1. 完整的 WebGL API 调用序列
+2. 着色器源码和编译信息
+3. 纹理和缓冲区状态
+4. 帧缓冲区和渲染缓冲区信息
+
+#### 学习资源：
+
+- **[完整英文教程](http://www.realtimerendering.com/blog/debugging-webgl-with-spectorjs/)**（英文）
+- 关键概念学习顺序：
+  1. WebGL 渲染管线基础
+  2. 着色器编程概念
+  3. 纹理和帧缓冲区
+  4. 顶点缓冲区对象(VBO)和索引缓冲区对象(IBO)
+
+#### 实用技巧：
+
+1. 使用"Markers"标记关键代码段
+2. 逐步增加捕获的命令数量（从100开始）
+3. 重点关注重复调用的命令
+4. 查看着色器编译错误和警告
+
+------
+
+### 四、图片压缩工具：[TinyPNG](https://tinypng.com/)
+
+#### 是什么？
+
+TinyPNG（及其JPEG版本TinyJPG）是一个智能有损图片压缩工具。
+
+#### 主要作用：
+
+1. **压缩PNG/JPEG图片**，大幅减小文件体积
+2. **保持视觉质量**，使用智能有损压缩算法
+3. **支持透明度**（PNG）
+4. **批量处理**功能
+
+#### 什么时候使用？
+
+✅ **应该使用的情况**：
+
+- 网页纹理贴图优化
+- UI元素和图标
+- 背景图片
+- 减少页面加载时间
+- 移动端应用优化
+
+❌ **不应该使用的情况**：
+
+- 需要绝对无损的图片（如医学影像）
+- 打印用高分辨率图片
+- 需要多次编辑的源文件
+
+#### 与 Three.js 配合的最佳实践：
+
+javascript
+
+```
+// 1. 先使用TinyPNG压缩纹理
+// 2. 然后使用Three.js加载
+const textureLoader = new THREE.TextureLoader();
+const texture = textureLoader.load('compressed-texture.jpg');
+
+// 3. 根据用途设置合适的过滤模式
+texture.minFilter = THREE.LinearMipmapLinearFilter;
+texture.magFilter = THREE.LinearFilter;
+```
+
+
+
+------
+
+### 五、WebGL 渲染器配置：powerPreference
+
+#### 参数说明：
+
+javascript
+
+```
+const renderer = new THREE.WebGLRenderer({
+    powerPreference: "high-performance", // 电源模式选择
+    antialias: true
+});
+```
+
+
+
+#### 可选值：
+
+- `"high-performance"`：优先使用高性能GPU（如独立显卡）
+- `"low-power"`：优先使用低功耗GPU（如集成显卡）
+- `"default"`：由浏览器决定（默认值）
+
+#### 使用建议：
+
+1. **高性能应用**（如游戏、复杂3D可视化）：
+
+   javascript
+
+   ```
+   powerPreference: "high-performance"
+   ```
+
+   
+
+2. **内容展示应用**（如产品展示、简单3D模型）：
+
+   javascript
+
+   ```
+   powerPreference: "low-power"  // 节省电池
+   ```
+
+   
+
+3. **通用应用**：
+
+   javascript
+
+   ```
+   powerPreference: "default"  // 让浏览器智能选择
+   ```
+
+   
+
+#### 注意事项：
+
+- 不是所有浏览器都支持此参数
+- 移动设备上可能被忽略
+- 实际效果取决于硬件和驱动
+
+------
+
+### 六、着色器性能优化
+
+#### 问题1：避免使用if语句
+
+**优化前**（性能差）：
+
+glsl
+
+```
+if(elevation < 0.5) {
+    elevation = 0.5;
+}
+```
+
+
+
+**优化后**（性能好）：
+
+glsl
+
+```
+// 方法1：使用clamp函数
+elevation = clamp(elevation, 0.5, 1.0);
+
+// 方法2：使用max函数（更高效）
+elevation = max(elevation, 0.5);
+```
+
+
+
+#### 为什么if语句性能差？
+
+1. GPU 采用 SIMD（单指令多数据）架构
+2. 分支语句（if/else）会导致线程分化
+3. 所有分支的代码都可能被执行
+4. 增加寄存器压力和指令缓存未命中
+
+#### 问题2：优化颜色混合计算
+
+**优化前**（性能差）：
+
+glsl
+
+```
+vec3 finalColor = vec3(0.0);
+finalColor.r += depthColor.r + (surfaceColor.r - depthColor.r) * elevation;
+finalColor.g += depthColor.g + (surfaceColor.g - depthColor.g) * elevation;
+finalColor.b += depthColor.b + (surfaceColor.b - depthColor.b) * elevation;
+```
+
+
+
+**优化后**（性能好）：
+
+glsl
+
+```
+vec3 finalColor = mix(depthColor, surfaceColor, elevation);
+```
+
+
+
+#### 优化原理：
+
+1. **减少指令数量**：从9次运算减少到1次函数调用
+2. **利用内置函数**：`mix()` 是硬件优化的内置函数
+3. **向量化操作**：一次性处理整个vec3，而不是每个分量
+
+------
+
+### 七、其他性能优化技巧（从代码中提取）
+
+#### 1. 几何体合并（Tip 18-19）
+
+javascript
+
+```
+// ❌ 低效：每个几何体单独渲染
+for(let i = 0; i < 50; i++) {
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+}
+
+// ✅ 高效：合并几何体
+const geometries = [];
+for(let i = 0; i < 50; i++) {
+    const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+    // 应用变换
+    geometry.rotateX(Math.random() * Math.PI);
+    geometry.translate(Math.random() * 10, Math.random() * 10, Math.random() * 10);
+    geometries.push(geometry);
+}
+
+const mergedGeometry = BufferGeometryUtils.mergeBufferGeometries(geometries);
+const mesh = new THREE.Mesh(mergedGeometry, material);
+scene.add(mesh);
+```
+
+
+
+#### 2. 实例化渲染（Tip 22）
+
+javascript
+
+```
+// 高效渲染大量相同物体
+const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+const material = new THREE.MeshNormalMaterial();
+
+const mesh = new THREE.InstancedMesh(geometry, material, 50);
+mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(mesh);
+
+// 设置每个实例的变换矩阵
+for(let i = 0; i < 50; i++) {
+    const position = new THREE.Vector3(
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10
+    );
+    
+    const matrix = new THREE.Matrix4();
+    matrix.makeRotationFromEuler(new THREE.Euler(
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+        0
+    ));
+    matrix.setPosition(position);
+    mesh.setMatrixAt(i, matrix);
+}
+```
+
+
+
+#### 3. 像素比优化（Tip 29）
+
+javascript
+
+```
+// 限制最大像素比，避免过高分辨率
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+```
+
+
+
+#### 4. 阴影优化（Tip 10-12）
+
+javascript
+
+```
+// 优化阴影相机范围
+directionalLight.shadow.camera.top = 3;
+directionalLight.shadow.camera.right = 6;
+directionalLight.shadow.camera.left = -6;
+directionalLight.shadow.camera.bottom = -3;
+directionalLight.shadow.camera.far = 10;
+
+// 适当设置阴影贴图分辨率
+directionalLight.shadow.mapSize.set(1024, 1024);
+
+// 手动控制阴影更新
+renderer.shadowMap.autoUpdate = false;
+renderer.shadowMap.needsUpdate = true; // 需要更新时调用
+```
+
+
+
+#### 5. 资源清理（Tip 6）
+
+javascript
+
+```
+// 从场景移除对象时清理资源
+scene.remove(mesh);
+mesh.geometry.dispose();
+mesh.material.dispose();
+```
+
+
+
+#### 6. 着色器精度优化
+
+javascript
+
+```
+const shaderMaterial = new THREE.ShaderMaterial({
+    precision: "lowp", // 使用低精度浮点数
+    // ... 其他配置
+});
+```
+
+
+
+#### 7. 使用uniform和define优化
+
+javascript
+
+```
+// 使用define传递常量（编译时常量）
+defines: {
+    DISPLACMENT_STRENGH: 1.5,
+}
+
+// 在着色器中直接使用
+modelPosition.y += elevation * DISPLACMENT_STRENGH;
+```
+
+
+
+------
+
+### 八、性能优化检查清单
+
+#### ✅ 渲染优化
+
+- 使用几何体合并（BufferGeometryUtils.mergeBufferGeometries）
+- 对于相同物体使用实例化（THREE.InstancedMesh）
+- 限制像素比（setPixelRatio）
+- 合理设置阴影参数
+- 使用视锥剔除（Frustum Culling）
+
+#### ✅ 着色器优化
+
+- 避免分支语句（if/else）
+- 使用内置函数（mix, clamp, max等）
+- 使用合适的精度（lowp/mediump/highp）
+- 减少纹理采样次数
+- 使用顶点着色器计算，而不是片元着色器
+
+#### ✅ 内存优化
+
+- 及时清理不用的几何体和材质
+- 使用纹理压缩
+- 重用几何体和材质实例
+- 使用对象池（Object Pooling）
+
+#### ✅ 加载优化
+
+- 压缩纹理图片（TinyPNG）
+- 使用适当的纹理格式
+- 实现渐进加载
+- 使用缓存策略
+
+------
+
+### 九、调试工具总结
+
+| 工具                | 用途         | 适用场景                 |
+| :------------------ | :----------- | :----------------------- |
+| **stats.js**        | 实时性能监控 | 帧率分析，性能基准测试   |
+| **Spector.js**      | WebGL调试    | 渲染管线分析，着色器调试 |
+| **Chrome DevTools** | 综合调试     | 内存分析，CPU性能分析    |
+| **TinyPNG**         | 图片压缩     | 纹理优化，加载性能提升   |
+
+通过合理使用这些工具和优化技巧，可以显著提升 Three.js 应用的性能表现，特别是在复杂场景和移动设备上。
 
 
 
@@ -5650,8 +6128,7 @@ window.addEventListener('resize', () => {
 
 
 
-
-## P48
+## P49
 
 
 

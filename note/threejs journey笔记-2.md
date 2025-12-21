@@ -6118,6 +6118,1010 @@ modelPosition.y += elevation * DISPLACMENT_STRENGH;
 
 
 
+## P49 Intro and Loading progress
+
+### 📋 目录
+
+1. **创建顺序与依赖关系问题**
+2. **自定义幕布（Overlay）实现**
+3. **模拟网络加载测试方法**
+4. **进度条（Loading Bar）实现**
+5. **完整代码整合**
+6. **常见问题与解决方案**
+
+------
+
+### 1. 📝 创建顺序与依赖关系问题
+
+#### 问题背景
+
+在Three.js应用中，资源的创建和加载顺序非常重要。特别是在使用异步加载和回调函数时，需要确保变量在使用前已经被正确定义。
+
+#### 核心问题：变量声明顺序
+
+javascript
+
+```
+// ❌ 错误示例：变量在使用后定义
+const loadingManager = new THREE.LoadingManager();
+loadingManager.onLoad = () => {
+  gsap.to(overlayMaterial.uniforms.uAlpha, { duration: 3, value: 0 }); // overlayMaterial尚未定义！
+};
+
+// 在后面才定义overlayMaterial
+const overlayMaterial = new THREE.ShaderMaterial({ ... });
+```
+
+
+
+#### 解决方案
+
+##### 方案1：调整声明顺序（推荐）
+
+javascript
+
+```
+// ✅ 正确示例：先定义，后使用
+// 1. 先创建所有依赖的变量
+const overlayMaterial = new THREE.ShaderMaterial({ ... });
+
+// 2. 再创建使用这些变量的回调
+const loadingManager = new THREE.LoadingManager();
+loadingManager.onLoad = () => {
+  gsap.to(overlayMaterial.uniforms.uAlpha, { duration: 3, value: 0 }); // 现在可以安全访问
+};
+```
+
+
+
+##### 方案2：理解异步执行顺序
+
+javascript
+
+```
+// 虽然看起来overlayMaterial在后面定义，但不会报错的原因：
+const loadingManager = new THREE.LoadingManager();
+
+// 这里只是定义了函数，并没有执行
+loadingManager.onLoad = () => {
+  console.log("加载完成");
+  gsap.to(overlayMaterial.uniforms.uAlpha, { duration: 3, value: 0 }); // ✅ 不会报错
+};
+
+// 同步代码继续执行...
+const overlayMaterial = new THREE.ShaderMaterial({ ... }); // 这里定义
+
+// 当所有资源加载完成（异步），onLoad回调才会执行
+// 此时overlayMaterial早已存在
+```
+
+
+
+**关键理解**：
+
+- 函数定义 ≠ 函数执行
+- 异步回调的执行时机晚于所有同步代码
+- 变量提升（hoisting）机制
+
+#### 最佳实践顺序
+
+javascript
+
+```
+onMounted(() => {
+  // 1. DOM相关操作
+  sizes.width = webgl.value!.clientWidth;
+  
+  // 2. 场景基础组件
+  const scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(...);
+  renderer = new THREE.WebGLRenderer(...);
+  
+  // 3. 视觉元素（包括幕布）
+  const overlayGeometry = new THREE.PlaneGeometry(2, 2, 1, 1);
+  const overlayMaterial = new THREE.ShaderMaterial({ ... });
+  const overlay = new THREE.Mesh(overlayGeometry, overlayMaterial);
+  scene.add(overlay);
+  
+  // 4. 资源管理系统（依赖前面创建的元素）
+  const loadingManager = new THREE.LoadingManager();
+  loadingManager.onLoad = () => {
+    gsap.to(overlayMaterial.uniforms.uAlpha, { duration: 3, value: 0 }); // ✅ 安全
+  };
+  
+  // 5. 交互系统
+  controls = new OrbitControls(camera, webgl.value);
+  
+  // 6. 动画循环
+  function render() { ... }
+  render();
+});
+```
+
+
+
+------
+
+### 2. 🎨 自定义幕布（Overlay）实现
+
+#### 幕布的作用
+
+- 防止用户看到未完全加载的场景
+- 提供视觉连贯性
+- 可以显示品牌标识或加载动画
+
+#### 技术实现
+
+##### 2.1 几何体与材质
+
+`new THREE.PlaneGeometry(2, 2, 1, 1)`**设置为2就是覆盖整个窗口**
+
+javascript
+
+```
+// 创建覆盖整个视口的几何体（NDC坐标系）
+const overlayGeometry = new THREE.PlaneGeometry(2, 2, 1, 1);
+
+// 创建自定义着色器材质
+const overlayMaterial = new THREE.ShaderMaterial({
+  transparent: true,                    // 启用透明
+  uniforms: {
+    uAlpha: { value: 1 }               // 透明度控制参数
+  },
+  vertexShader: `
+    void main() {
+      // NDC坐标系，覆盖整个视口
+      gl_Position = vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform float uAlpha;
+    
+    void main() {
+      // 黑色半透明背景
+      gl_FragColor = vec4(0.0, 0.0, 0.0, uAlpha);
+    }
+  `
+});
+
+const overlay = new THREE.Mesh(overlayGeometry, overlayMaterial);
+scene.add(overlay);
+```
+
+
+
+##### 2.2 NDC坐标系原理
+
+text
+
+```
+NDC (Normalized Device Coordinates) 坐标系：
+- 范围：-1 到 1
+- 中心点：(0, 0)
+- 右上角：(1, 1)
+- 左下角：(-1, -1)
+
+PlaneGeometry(2, 2) 正好覆盖整个视口：
+( -1, -1 ) ─────────── ( 1, -1 )
+       │                     │
+       │                     │
+       │                     │
+       │                     │
+( -1, 1 ) ──────────── ( 1, 1 )
+```
+
+
+
+##### 2.3 幕布淡出动画
+
+javascript
+
+```
+// 使用GSAP实现平滑淡出
+gsap.to(overlayMaterial.uniforms.uAlpha, {
+  duration: 3,        // 动画时长3秒
+  value: 0,           // 透明度降到0（完全透明）
+  ease: "power2.out", // 缓动函数
+  delay: 1            // 延迟1秒开始
+});
+```
+
+
+
+#### 幕布的高级应用
+
+##### 添加加载动画
+
+javascript
+
+```
+// 在片段着色器中添加动态效果
+fragmentShader: `
+  uniform float uAlpha;
+  uniform float uTime;
+  
+  void main() {
+    // 简单的脉冲效果
+    float pulse = sin(uTime * 2.0) * 0.1 + 0.9;
+    vec3 color = vec3(0.0, 0.0, 0.0) * pulse;
+    
+    gl_FragColor = vec4(color, uAlpha);
+  }
+`;
+
+// 在动画循环中更新时间
+function animate() {
+  const elapsedTime = clock.getElapsedTime();
+  overlayMaterial.uniforms.uTime.value = elapsedTime;
+}
+```
+
+
+
+##### 品牌定制
+
+javascript
+
+```
+// 使用品牌颜色
+uniforms: {
+  uAlpha: { value: 1 },
+  uColor: { value: new THREE.Color("#1a1a2e") } // 深蓝色背景
+},
+
+fragmentShader: `
+  uniform float uAlpha;
+  uniform vec3 uColor;
+  
+  void main() {
+    gl_FragColor = vec4(uColor, uAlpha);
+  }
+`;
+```
+
+
+
+------
+
+### 3. 🌐 模拟网络加载测试
+
+#### 测试目的
+
+- 模拟真实网络环境
+- 测试加载进度条的显示效果
+- 验证错误处理机制
+
+### Chrome开发者工具设置
+
+##### 步骤1：打开网络面板
+
+text
+
+```
+方法1：F12 → 选择"Network"标签
+方法2：右键点击 → "检查" → "Network"
+```
+
+
+
+##### 步骤2：禁用缓存
+
+javascript
+
+```
+// 确保每次加载都从服务器获取
+☑️ Disable cache (停用缓存)
+```
+
+
+
+##### 步骤3：选择网络预设
+
+| 预设        | 下载速度 | 上传速度 | 延迟  | 适用场景 |
+| :---------- | :------- | :------- | :---- | :------- |
+| **Online**  | 原生速度 | 原生速度 | 原生  | 正常网络 |
+| **Fast 3G** | 1.5Mbps  | 750Kbps  | 40ms  | 移动网络 |
+| **Slow 3G** | 400Kbps  | 400Kbps  | 400ms | 弱网环境 |
+| **Offline** | 0        | 0        | -     | 断网测试 |
+
+##### 步骤4：自定义网络设置
+
+javascript
+
+```
+// 自定义设置示例：
+下载速度：1000 Kbps (≈125KB/s)
+上传速度：500 Kbps (≈62.5KB/s)
+延迟：200ms
+
+// 创建自定义预设：
+1. 选择"Custom"
+2. 输入参数
+3. 点击"Add"保存为预设
+```
+
+
+
+#### 测试场景设计
+
+##### 测试1：正常加载
+
+javascript
+
+```
+// 使用"Online"预设
+// 预期：快速加载，进度条平滑增长
+```
+
+
+
+##### 测试2：弱网环境
+
+javascript
+
+```
+// 使用"Slow 3G"预设
+// 预期：缓慢加载，进度条有明显分段
+```
+
+
+
+##### 测试3：加载中断
+
+javascript
+
+```
+// 步骤：
+1. 开始加载
+2. 在控制台选择"Offline"
+3. 观察错误处理
+4. 恢复网络，观察重试机制
+```
+
+
+
+#### 调试技巧
+
+##### 监控加载进度
+
+javascript
+
+```
+loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+  console.log(`📦 ${url}`);
+  console.log(`📊 进度: ${itemsLoaded}/${itemsTotal} (${(itemsLoaded/itemsTotal*100).toFixed(1)}%)`);
+  
+  // 详细资源信息
+  const fileExtension = url.split('.').pop();
+  console.log(`📄 文件类型: ${fileExtension}`);
+};
+```
+
+
+
+##### 性能监控
+
+javascript
+
+```
+// 使用Stats.js监控性能
+const stats = new Stats();
+stats.showPanel(0); // 0: FPS, 1: MS, 2: MB
+document.body.appendChild(stats.dom);
+
+// 在渲染循环中
+function render() {
+  stats.begin();
+  // 渲染代码...
+  stats.end();
+  requestAnimationFrame(render);
+}
+```
+
+
+
+------
+
+### 4. 📊 进度条（Loading Bar）实现
+
+#### 设计目标
+
+- 直观显示加载进度
+- 平滑的动画效果
+- 清晰的完成反馈
+- 良好的用户体验
+
+### HTML结构
+
+html
+
+```
+<div class="container">
+  <!-- 3D场景容器 -->
+  <div ref="webgl" class="webgl"></div>
+  
+  <!-- 加载进度条 -->
+  <div ref="loadingBar" class="loading-bar"></div>
+</div>
+```
+
+
+
+### CSS样式
+
+css
+
+```
+.loading-bar {
+  position: absolute;
+  top: 50%;                    /* 垂直居中 */
+  left: 0;
+  width: 100%;
+  height: 2px;                 /* 细线设计 */
+  background: #ffffff;         /* 白色进度条 */
+  
+  /* 关键变换属性 */
+  transform: scaleX(0);        /* 初始宽度为0 */
+  transform-origin: left;      /* 缩放原点在左侧 */
+  
+  /* 过渡效果 */
+  transition: transform 0.3s ease-out;  /* 加载时的过渡 */
+  z-index: 1000;               /* 确保在最上层 */
+}
+
+/* 加载完成状态 */
+.loading-bar.ended {
+  transform: scaleX(0);        /* 宽度为0 */
+  transform-origin: right;     /* 从右侧消失 */
+  transition: transform 1.5s ease-in-out;  /* 消失时的过渡 */
+}
+```
+
+
+
+### JavaScript控制逻辑
+
+##### 4.1 初始化设置
+
+javascript
+
+```
+// 获取DOM元素引用
+const loadingBar = useTemplateRef("loadingBar");
+
+// 在加载开始时重置进度条
+loadingManager.onStart = () => {
+  loadingBar.value.style.transform = 'scaleX(0)';
+  loadingBar.value.classList.remove('ended');
+};
+```
+
+
+
+##### 4.2 进度更新
+
+javascript
+
+```
+loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+  // 计算进度比例
+  const progressRatio = itemsLoaded / itemsTotal;
+  
+  // 更新进度条宽度
+  loadingBar.value.style.transform = `scaleX(${progressRatio})`;
+};
+```
+
+
+
+##### 4.3 加载完成处理
+
+javascript
+
+```
+loadingManager.onLoad = () => {
+  console.log("✅ 所有资源加载完成");
+  
+  // 第一步：确保进度条显示100%
+  loadingBar.value.style.transform = 'scaleX(1)';
+  
+  // 第二步：等待300ms，让用户看到100%
+  setTimeout(() => {
+    // 添加ended类，触发CSS消失动画
+    loadingBar.value.classList.add('ended');
+    
+    // 第三步：等待进度条消失后，淡出幕布
+    setTimeout(() => {
+      gsap.to(overlayMaterial.uniforms.uAlpha, {
+        duration: 3,
+        value: 0,
+        ease: "power2.out"
+      });
+    }, 1500); // 等待1.5秒（进度条消失动画时长）
+  }, 300); // 等待300ms
+};
+```
+
+
+
+#### 关键技术细节
+
+##### 4.4 `transform: scaleX()` vs `width`
+
+css
+
+```
+/* ✅ 推荐：使用transform: scaleX() */
+.loading-bar {
+  transform: scaleX(0.5);  /* 宽度为50% */
+  transform-origin: left;
+}
+
+/* ❌ 不推荐：使用width */
+.loading-bar {
+  width: 50%;  /* 性能较差，可能引起重排 */
+}
+```
+
+
+
+**优势**：
+
+- 更好的性能（使用GPU加速）
+- 不会引起布局重排
+- 支持平滑过渡动画
+
+##### 4.5 `transform-origin`的作用
+
+css
+
+```
+/* 加载时：从左侧扩展 */
+transform-origin: left;
+
+/* 消失时：从右侧收缩 */
+transform-origin: right;
+```
+
+
+
+##### 4.6 `transform`默认值问题
+
+javascript
+
+```
+// ❌ 错误：清空内联样式，可能恢复到CSS默认值
+loadingBar.value.style.transform = "";
+
+// ✅ 正确：设置为具体的值
+loadingBar.value.style.transform = 'scaleX(0)';
+```
+
+
+
+#### 进度条动画序列
+
+text
+
+```
+开始加载 → 进度条从0开始增长 → 实时更新进度 →
+加载完成 → 进度条快速到达100% → 短暂停留(300ms) →
+从右侧开始消失(1.5s) → 幕布开始淡出(3s) → 完全显示场景
+```
+
+
+
+------
+
+### 5. 🧩 完整代码整合
+
+vue
+
+```
+<script setup lang="ts">
+import { ref, useTemplateRef, onMounted, onUnmounted } from "vue";
+import * as THREE from "three";
+import gsap from "gsap";
+import Stats from "stats.js";
+
+// Three.js扩展导入
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
+
+/**
+ * 性能监控
+ */
+const stats = new Stats();
+stats.showPanel(0);
+document.body.appendChild(stats.dom);
+
+/**
+ * 尺寸配置
+ */
+const sizes = {
+  width: 800,
+  height: 600,
+  resolution: new THREE.Vector2(800, 600),
+  pixelRatio: Math.min(window.devicePixelRatio, 2),
+};
+sizes.resolution.set(
+  sizes.width * sizes.pixelRatio,
+  sizes.height * sizes.pixelRatio
+);
+
+/**
+ * DOM引用
+ */
+const webgl = useTemplateRef("webgl");
+const loadingBar = useTemplateRef("loadingBar");
+
+/**
+ * 全局变量声明
+ */
+let camera: THREE.PerspectiveCamera | null = null;
+let renderer: THREE.WebGLRenderer | null = null;
+let controls: OrbitControls | null = null;
+let overlayMaterial: THREE.ShaderMaterial | null = null;
+
+/**
+ * 事件处理函数
+ */
+const handleResize = () => {
+  if (!webgl.value || !camera || !renderer) return;
+
+  const container = webgl.value;
+  sizes.width = container.clientWidth;
+  sizes.height = container.clientHeight;
+  sizes.pixelRatio = Math.min(window.devicePixelRatio, 2);
+  sizes.resolution.set(
+    sizes.width * sizes.pixelRatio,
+    sizes.height * sizes.pixelRatio
+  );
+
+  camera.aspect = sizes.width / sizes.height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(sizes.width, sizes.height);
+  renderer.setPixelRatio(sizes.pixelRatio);
+
+  if (controls) controls.update();
+};
+
+/**
+ * 组件挂载
+ */
+onMounted(() => {
+  // 1. 获取容器尺寸
+  sizes.width = webgl.value!.clientWidth;
+  sizes.height = webgl.value!.clientHeight;
+
+  // 2. 创建场景
+  const scene = new THREE.Scene();
+
+  // 3. 创建渲染器
+  renderer = new THREE.WebGLRenderer({
+    powerPreference: "high-performance",
+    antialias: true,
+  });
+  renderer.setSize(sizes.width, sizes.height);
+  renderer.setPixelRatio(sizes.pixelRatio);
+  renderer.setClearColor("#29191f");
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ReinhardToneMapping;
+  renderer.toneMappingExposure = 3;
+  webgl.value!.appendChild(renderer.domElement);
+
+  // 4. 创建自定义幕布（Overlay）
+  const overlayGeometry = new THREE.PlaneGeometry(2, 2, 1, 1);
+  overlayMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    uniforms: {
+      uAlpha: { value: 1 },
+    },
+    vertexShader: `
+      void main() {
+        gl_Position = vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uAlpha;
+      void main() {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, uAlpha);
+      }
+    `,
+  });
+  const overlay = new THREE.Mesh(overlayGeometry, overlayMaterial);
+  scene.add(overlay);
+
+  // 5. 创建加载管理器
+  const loadingManager = new THREE.LoadingManager();
+
+  loadingManager.onStart = () => {
+    console.log("🚀 开始加载资源");
+    // 重置进度条
+    loadingBar.value.style.transform = 'scaleX(0)';
+    loadingBar.value.classList.remove('ended');
+  };
+
+  loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+    const progressRatio = itemsLoaded / itemsTotal;
+    console.log(`📊 进度: ${(progressRatio * 100).toFixed(1)}%`);
+    
+    // 更新进度条
+    loadingBar.value.style.transform = `scaleX(${progressRatio})`;
+  };
+
+  loadingManager.onLoad = () => {
+    console.log("✅ 所有资源加载完成");
+    
+    // 第一步：确保进度条显示100%
+    loadingBar.value.style.transform = 'scaleX(1)';
+    
+    // 第二步：短暂停留后开始消失动画
+    setTimeout(() => {
+      loadingBar.value.classList.add('ended');
+      
+      // 第三步：进度条消失后淡出幕布
+      setTimeout(() => {
+        gsap.to(overlayMaterial!.uniforms.uAlpha, {
+          duration: 3,
+          value: 0,
+          ease: "power2.out"
+        });
+      }, 1500);
+    }, 300);
+  };
+
+  loadingManager.onError = (url) => {
+    console.error(`❌ 加载失败: ${url}`);
+  };
+
+  // 6. 创建加载器（使用同一个loadingManager）
+  const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
+  const gltfLoader = new GLTFLoader(loadingManager);
+
+  // 7. 加载环境贴图
+  const environmentMap = cubeTextureLoader.load([
+    // 六个面的贴图路径...
+  ]);
+  environmentMap.colorSpace = THREE.SRGBColorSpace;
+  scene.background = environmentMap;
+  scene.environment = environmentMap;
+
+  // 8. 加载3D模型
+  const modelPath = `${import.meta.env.BASE_URL}models/FlightHelmet/glTF/FlightHelmet.gltf`;
+  gltfLoader.load(
+    modelPath,
+    (gltf) => {
+      gltf.scene.scale.set(10, 10, 10);
+      gltf.scene.position.set(0, -4, 0);
+      gltf.scene.rotation.y = Math.PI * 0.5;
+      scene.add(gltf.scene);
+    },
+    (xhr) => {
+      // 额外的进度回调（可选）
+      console.log(`模型加载: ${(xhr.loaded / xhr.total * 100).toFixed(1)}%`);
+    },
+    (error) => {
+      console.error("模型加载失败:", error);
+    }
+  );
+
+  // 9. 创建相机
+  camera = new THREE.PerspectiveCamera(
+    75,
+    sizes.width / sizes.height,
+    0.1,
+    100
+  );
+  camera.position.set(4, 1, -4);
+  scene.add(camera);
+
+  // 10. 创建控制器
+  controls = new OrbitControls(camera, webgl.value);
+  controls.enableDamping = true;
+
+  // 11. 添加灯光
+  const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
+  directionalLight.castShadow = true;
+  directionalLight.position.set(0.25, 3, -2.25);
+  scene.add(directionalLight);
+
+  // 12. 添加辅助工具
+  const axesHelper = new THREE.AxesHelper(5);
+  scene.add(axesHelper);
+
+  // 13. 动画循环
+  const clock = new THREE.Clock();
+  function render() {
+    stats.begin();
+    if (!camera || !renderer || !controls) return;
+
+    const deltaTime = clock.getDelta();
+    const elapsedTime = clock.elapsedTime;
+
+    controls.update();
+    renderer.render(scene, camera);
+    
+    stats.end();
+    requestAnimationFrame(render);
+  }
+  render();
+
+  // 14. 添加事件监听
+  window.addEventListener("resize", handleResize);
+});
+
+/**
+ * 组件卸载
+ */
+onUnmounted(() => {
+  window.removeEventListener("resize", handleResize);
+  
+  if (renderer) {
+    renderer.dispose();
+    renderer = null;
+  }
+  
+  if (controls) {
+    controls.dispose();
+    controls = null;
+  }
+  
+  camera = null;
+  overlayMaterial = null;
+});
+</script>
+
+<template>
+  <div class="container">
+    <div ref="webgl" class="webgl"></div>
+    <div ref="loadingBar" class="loading-bar"></div>
+  </div>
+</template>
+
+<style scoped>
+.container {
+  height: 100vh;
+  overflow-y: scroll;
+}
+
+.webgl {
+  width: 100vw;
+  height: 100vh;
+  background-color: rgb(38, 25, 65);
+  top: 0;
+  left: 0;
+  position: fixed;
+}
+
+.loading-bar {
+  position: absolute;
+  top: 50%;
+  width: 100%;
+  height: 2px;
+  background: #ffffff;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease-out;
+  z-index: 1000;
+}
+
+.loading-bar.ended {
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 1.5s ease-in-out;
+}
+</style>
+```
+
+
+
+------
+
+### 6. ⚠️ 常见问题与解决方案
+
+#### 问题1：进度条提前消失
+
+**症状**：进度条还没到100%就消失了
+**原因**：`loadingBar.value.style.transform = ""` 清除了内联样式
+**解决**：不要清空，而是设置为具体的值
+
+javascript
+
+```
+// ❌ 错误
+loadingBar.value.style.transform = "";
+
+// ✅ 正确
+loadingBar.value.style.transform = 'scaleX(1)';
+```
+
+
+
+#### 问题2：幕布闪烁或消失太快
+
+**症状**：幕布在加载完成前就消失了
+**原因**：`overlayMaterial.uniforms.uAlpha`被提前设置为0
+**解决**：确保只在加载完成后才开始淡出
+
+javascript
+
+```
+// ❌ 错误（可能在错误的位置调用）
+gsap.to(overlayMaterial.uniforms.uAlpha, { duration: 3, value: 0 });
+
+// ✅ 正确（放在onLoad回调中）
+loadingManager.onLoad = () => {
+  // ...进度条处理...
+  setTimeout(() => {
+    gsap.to(overlayMaterial.uniforms.uAlpha, { duration: 3, value: 0 });
+  }, 1500);
+};
+```
+
+
+
+#### 问题3：进度条动画不流畅
+
+**症状**：进度条更新时有卡顿
+**原因**：更新频率太高或CSS过渡时间太短
+**解决**：优化更新频率和过渡时间
+
+css
+
+```
+/* 合适的过渡时间 */
+.loading-bar {
+  transition: transform 0.3s ease-out; /* 不是0.1s或0s */
+}
+```
+
+
+
+#### 问题4：幕布覆盖了交互元素
+
+**症状**：无法点击幕布后面的按钮
+**解决**：设置合适的pointer-events属性
+
+css
+
+```
+/* 加载时允许点击 */
+.loading-bar {
+  pointer-events: none;
+}
+
+/* 或者使用JavaScript控制 */
+loadingBar.value.style.pointerEvents = 'none';
+```
+
+
+
+#### 问题5：资源加载失败处理
+
+**实现错误处理和重试机制**
+
+javascript
+
+```
+loadingManager.onError = (url) => {
+  console.error(`加载失败: ${url}`);
+  
+  // 可选：显示错误信息
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'load-error';
+  errorDiv.textContent = `无法加载: ${url.split('/').pop()}`;
+  document.body.appendChild(errorDiv);
+  
+  // 可选：重试逻辑
+  setTimeout(() => {
+    console.log(`重试加载: ${url}`);
+    // 重新加载逻辑...
+  }, 3000);
+};
+```
 
 
 
@@ -6128,7 +7132,10 @@ modelPosition.y += elevation * DISPLACMENT_STRENGH;
 
 
 
-## P49
+
+
+
+## P50
 
 
 

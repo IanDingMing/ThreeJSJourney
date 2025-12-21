@@ -48,12 +48,15 @@ import pzEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/pz.jpg";
 import nzEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/nz.jpg";
 
 /**
- * Stats
+ * 性能监控
  */
 const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
 
+/**
+ * 尺寸配置
+ */
 const sizes = {
   width: 800,
   height: 600,
@@ -64,10 +67,16 @@ sizes.resolution.set(
   sizes.width * sizes.pixelRatio,
   sizes.height * sizes.pixelRatio
 );
+
+/**
+ * DOM引用
+ */
 const webgl = useTemplateRef("webgl");
 const loadingBar = useTemplateRef("loadingBar");
 
-// 1. 声明需要复用的变量
+/**
+ * 全局变量声明
+ */
 let camera: THREE.PerspectiveCamera | null = null;
 let renderer: THREE.WebGLRenderer | null = null;
 let effectComposer: EffectComposer | null = null;
@@ -76,8 +85,11 @@ const gui: GUI = new GUI();
 const meshArray: THREE.Mesh[] = [];
 const global = { envMapIntensity: 2.5 };
 let model: THREE.Group | null = null;
+let overlayMaterial: THREE.ShaderMaterial | null = null;
 
-// 2. 声明事件处理函数
+/**
+ * 事件处理函数
+ */
 const handleResize = () => {
   if (!webgl.value || !camera || !renderer) return;
 
@@ -134,7 +146,53 @@ const updateAllMaterials = (scene: THREE.Scene) => {
 };
 
 onMounted(() => {
-  // 加载纹理
+  // 1. 获取容器尺寸
+  // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
+  sizes.width = webgl.value!.clientWidth;
+  sizes.height = webgl.value!.clientHeight;
+
+  // 2. 创建场景
+  const scene = new THREE.Scene();
+  // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
+
+  // 3. 创建渲染器
+  const rendererParameters = { clearColor: "#29191f" };
+  renderer = new THREE.WebGLRenderer({
+    powerPreference: "high-performance", // 电源模式
+    antialias: true,
+  });
+  renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
+  renderer.setPixelRatio(sizes.pixelRatio);
+  renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ReinhardToneMapping;
+  renderer.toneMappingExposure = 3;
+  webgl.value!.appendChild(renderer.domElement);
+
+  // 4. 创建自定义幕布（Overlay）
+  const overlayGeometry = new THREE.PlaneGeometry(2, 2, 1, 1);
+  overlayMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    uniforms: {
+      uAlpha: { value: 1 },
+    },
+    vertexShader: `
+      void main() {
+        gl_Position = vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uAlpha;
+      void main() {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, uAlpha);
+      }
+    `,
+  });
+  const overlay = new THREE.Mesh(overlayGeometry, overlayMaterial);
+  scene.add(overlay);
+
+  // 5. 创建加载管理器
   const loadingManager = new THREE.LoadingManager();
   loadingManager.onStart = () => {
     console.log("Loading started");
@@ -167,10 +225,13 @@ onMounted(() => {
     console.log(`There was an error loading ${url}`);
   };
 
+  // 6. 创建加载器（使用同一个loadingManager）
   const texturesLoader = new THREE.TextureLoader(loadingManager);
-  const rgbeLoader = new RGBELoader();
-  // 加载立方体贴图
+  const rgbeLoader = new RGBELoader(loadingManager);
   const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
+  const gltfLoader = new GLTFLoader(loadingManager);
+
+  // 7. 加载环境贴图
   const environmentMap = cubeTextureLoader.load([
     pxEnvironmentMapsPath,
     nxEnvironmentMapsPath,
@@ -180,80 +241,23 @@ onMounted(() => {
     nzEnvironmentMapsPath,
   ]);
   environmentMap.colorSpace = THREE.SRGBColorSpace;
-  // 1. 初始化加载器
-  const gltfLoader = new GLTFLoader(loadingManager);
-
-  // 2. 定义模型路径（支持 gltf/glb 等格式）
-  const modelPath = `${
-    import.meta.env.BASE_URL
-  }models/FlightHelmet/glTF/FlightHelmet.gltf`; // 文件路径：/public/models/Duck
-
-  // console.log(webgl, webgl.value?.clientHeight, webgl.value?.clientWidth);
-  sizes.width = webgl.value!.clientWidth;
-  sizes.height = webgl.value!.clientHeight;
-
-  // 创建3D场景对象Scene
-  const scene = new THREE.Scene();
-  // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
   scene.background = environmentMap;
   scene.environment = environmentMap;
 
-  // 创建渲染器对象
-  const rendererParameters = { clearColor: "#29191f" };
-  renderer = new THREE.WebGLRenderer({
-    powerPreference: "high-performance", // 电源模式
-    antialias: true,
-  });
-  renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
-  renderer.setPixelRatio(sizes.pixelRatio);
-  renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ReinhardToneMapping;
-  renderer.toneMappingExposure = 3;
-
-  webgl.value!.appendChild(renderer.domElement);
-
-  /**
-   * Overlay
-   */
-  const overlayGeometry = new THREE.PlaneGeometry(2, 2, 1, 1);
-  const overlayMaterial = new THREE.ShaderMaterial({
-    // wireframe: true,
-    transparent: true,
-    uniforms: {
-      uAlpha: { value: 1 },
-    },
-    vertexShader: `
-        void main()
-        {
-            gl_Position = vec4(position, 1.0);
-        }
-    `,
-    fragmentShader: `
-        uniform float uAlpha;
-
-        void main()
-        {
-            gl_FragColor = vec4(0.0, 0.0, 0.0, uAlpha);
-        }
-    `,
-  });
-  const overlay = new THREE.Mesh(overlayGeometry, overlayMaterial);
-  scene.add(overlay);
-
   // 模型mesh==========================
-  // 3. 执行加载
+  // 8. 加载3D模型
+  const modelPath = `${
+    import.meta.env.BASE_URL
+  }models/DamagedHelmet/glTF/DamagedHelmet.gltf`; // 文件路径：/public/models/Duck
   gltfLoader.load(
     modelPath,
     // 加载成功回调
     (gltf) => {
-      gltf.scene.scale.set(10, 10, 10);
-      gltf.scene.position.set(0, -4, 0);
-      gltf.scene.rotation.y = Math.PI * 0.5;
-      scene.add(gltf.scene);
+        gltf.scene.scale.set(2.5, 2.5, 2.5)
+        gltf.scene.rotation.y = Math.PI * 0.5
+        scene.add(gltf.scene)
 
-      updateAllMaterials(scene);
+        updateAllMaterials(scene)
     },
     // 加载进度回调
     (xhr) => {
@@ -264,25 +268,9 @@ onMounted(() => {
       console.error("加载失败：", error);
     }
   );
-  /**
-   * Lights
-   */
-  const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
-  directionalLight.castShadow = true;
-  directionalLight.shadow.camera.far = 15;
-  directionalLight.shadow.mapSize.set(1024, 1024);
-  directionalLight.shadow.normalBias = 0.05;
-  directionalLight.position.set(0.25, 3, -2.25);
-  scene.add(directionalLight);
+
   // 模型mesh==========================
-
-  const axesHelper = new THREE.AxesHelper(5); //创建一个坐标轴辅助对象
-  scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
-
-  /**
-   * Camera
-   */
-  // Base camera
+  // 9. 创建相机
   camera = new THREE.PerspectiveCamera(
     75,
     sizes.width / sizes.height,
@@ -292,10 +280,24 @@ onMounted(() => {
   camera.position.set(4, 1, -4);
   scene.add(camera);
 
-  // Controls
+  // 10. 创建控制器
   controls = new OrbitControls(camera, webgl.value);
   controls.enableDamping = true;
 
+  // 11. 添加灯光
+  const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
+  directionalLight.castShadow = true;
+  directionalLight.shadow.camera.far = 15;
+  directionalLight.shadow.mapSize.set(1024, 1024);
+  directionalLight.shadow.normalBias = 0.05;
+  directionalLight.position.set(0.25, 3, -2.25);
+  scene.add(directionalLight);
+
+  // 12. 添加辅助工具
+  const axesHelper = new THREE.AxesHelper(5); //创建一个坐标轴辅助对象
+  scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
+
+  // 13. 动画循环
   const clock = new THREE.Clock(); //创建一个时钟对象，用于计算时间差
   function render() {
     stats.begin();
@@ -316,10 +318,13 @@ onMounted(() => {
   }
   render();
 
-  // 添加事件监听
+  // 14. 添加事件监听
   window.addEventListener("resize", handleResize);
 });
-// 组件卸载时移除事件监听
+
+/**
+ * 组件卸载
+ */
 onUnmounted(() => {
   // 移除事件监听
   window.removeEventListener("resize", handleResize);

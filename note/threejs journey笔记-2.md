@@ -6118,7 +6118,7 @@ modelPosition.y += elevation * DISPLACMENT_STRENGH;
 
 
 
-## P49 Intro and Loading progress
+## P49 ⭐️Intro and Loading progress 幕布和自定义进度条 💡⭐️完整代码整合
 
 ### 📋 目录
 

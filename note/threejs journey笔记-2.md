@@ -7127,15 +7127,143 @@ loadingManager.onError = (url) => {
 
 
 
+## P50 Mixing HTML and WebGL 3js 场景与 HTML 元素的动态交互
+
+### 一、核心思路
+
+这节课实现了 Three.js 3D 场景与 HTML 元素的动态交互，主要目标是：
+
+1. **3D 空间标记点系统**：在 3D 场景中定义特定位置
+2. **HTML 标签跟随**：让 HTML 元素跟随 3D 点在屏幕上的投影位置
+3. **智能显示/隐藏**：根据遮挡关系动态控制 HTML 元素的可见性
+
+### 二、技术实现原理
+
+#### 1. HTML 元素与 3D 空间位置的联动机制
+
+##### 关键步骤：
+
+javascript
+
+```
+// 步骤1：定义兴趣点数组
+const points = [
+  {
+    position: new THREE.Vector3(1.55, 0.3, -0.6),  // 3D 空间坐标
+    element: document.querySelector('.point-0')    // 对应的 HTML 元素
+  },
+  // ... 其他点
+]
+
+// 步骤2：3D 坐标 → 2D 屏幕坐标转换
+const screenPosition = point.position.clone()
+screenPosition.project(camera)  // 关键方法：将 3D 坐标投影到相机视角的 2D 坐标
+
+// 步骤3：屏幕坐标 → HTML 位置
+const translateX = screenPosition.x * sizes.width * 0.5
+const translateY = -screenPosition.y * sizes.height * 0.5
+point.element.style.transform = `translateX(${translateX}px) translateY(${translateY}px)`
+```
 
 
 
+##### 坐标转换说明：
+
+- `project(camera)`：Three.js 内置方法，将世界坐标转换为**标准化设备坐标**（NDC）
+- NDC 范围：(-1, -1, -1) 到 (1, 1, 1)
+- 转换公式：
+  - `x_screen = (NDC_x + 1) * (width / 2)`
+  - `y_screen = (-NDC_y + 1) * (height / 2)` （Y 轴方向相反）
+
+#### 2. 3个点的显示/消失逻辑
+
+##### 遮挡检测机制：
+
+javascript
+
+```
+// 步骤1：从屏幕位置发射射线
+raycaster.setFromCamera(screenPosition, camera)
+
+// 步骤2：检测射线与场景物体的交点
+const intersects = raycaster.intersectObjects(scene.children, true)
+
+// 步骤3：判断逻辑
+if (intersects.length === 0) {
+  // 情况A：没有交点 → 点在场景前方 → 显示
+  point.element.classList.add('visible')
+} else {
+  const intersectionDistance = intersects[0].distance
+  const pointDistance = point.position.distanceTo(camera.position)
+  
+  if (intersectionDistance < pointDistance) {
+    // 情况B：交点比点更近 → 点被遮挡 → 隐藏
+    point.element.classList.remove('visible')
+  } else {
+    // 情况C：交点比点更远 → 点在物体前方 → 显示
+    point.element.classList.add('visible')
+  }
+}
+```
 
 
 
+##### 三种状态分析：
+
+| 状态         | 触发条件                  | 视觉效果                         |
+| :----------- | :------------------------ | :------------------------------- |
+| **始终显示** | 射线没有与任何物体相交    | 点在空旷区域，前方无遮挡         |
+| **智能隐藏** | 射线相交点 < 点到相机距离 | 点被其他物体（如墙壁、模型）遮挡 |
+| **智能显示** | 射线相交点 > 点到相机距离 | 点在物体前方，可见               |
+
+#### 3. 系统流程总结
+
+text
+
+```
+初始化阶段：
+1. 定义 points 数组（3D位置 + HTML引用）
+2. 等待场景加载完成（sceneReady = true）
+
+每帧循环：
+1. 遍历所有兴趣点
+2. 将 3D 坐标转换为 2D 屏幕坐标
+3. 使用 Raycaster 检测遮挡
+4. 根据遮挡结果设置 .visible 类
+5. 更新 HTML 元素的 transform 位置
+```
 
 
-## P50
+
+### 三、CSS 样式控制
+
+css
+
+```
+/* 初始状态：隐藏 */
+.point .label {
+  transform: scale(0, 0);  /* 完全缩小 */
+  transition: transform 0.3s;
+}
+
+/* 可见状态：显示 */
+.point.visible .label {
+  transform: scale(1, 1);  /* 恢复正常大小 */
+}
+
+/* 文字提示悬停效果 */
+.point .text {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.point:hover .text {
+  opacity: 1;
+}
+```
+
+
 
 
 

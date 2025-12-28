@@ -168,6 +168,7 @@ onMounted(() => {
   // renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // renderer.toneMapping = THREE.ReinhardToneMapping;
   // renderer.toneMappingExposure = 3;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   webgl.value!.appendChild(renderer.domElement);
 
   // 4. 创建自定义幕布（Overlay）
@@ -190,7 +191,7 @@ onMounted(() => {
     `,
   });
   const overlay = new THREE.Mesh(overlayGeometry, overlayMaterial);
-  // scene.add(overlay);
+  scene.add(overlay);
 
   // 5. 创建加载管理器
   let sceneReady = false;
@@ -250,39 +251,64 @@ onMounted(() => {
   // scene.environment = environmentMap;
 
   // 模型mesh==========================
-  // 8. 加载3D模型
-  // const modelPath = `${
-  //   import.meta.env.BASE_URL
-  // }models/DamagedHelmet/glTF/DamagedHelmet.gltf`; // 文件路径：/public/models/Duck
-  // gltfLoader.load(
-  //   modelPath,
-  //   // 加载成功回调
-  //   (gltf) => {
-  //     gltf.scene.scale.set(2.5, 2.5, 2.5);
-  //     gltf.scene.rotation.y = Math.PI * 0.5;
-  //     scene.add(gltf.scene);
-
-  //     updateAllMaterials(scene);
-  //   },
-  //   // 加载进度回调
-  //   (xhr) => {
-  //     console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-  //   },
-  //   // 加载错误回调
-  //   (error) => {
-  //     console.error("加载失败：", error);
-  //   }
-  // );
+  /**
+   * Textures
+   */
+  const bakedTexture = texturesLoader.load(
+    `${import.meta.env.BASE_URL}models/portal/baked.jpg`
+  );
+  bakedTexture.flipY = false;
+  bakedTexture.colorSpace = THREE.SRGBColorSpace;
 
   /**
-   * Object
+   * Materials
    */
-  const cube = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshBasicMaterial()
-  );
+  const bakedMaterial = new THREE.MeshBasicMaterial({ map: bakedTexture });
 
-  scene.add(cube);
+  // Portal light material
+  const portalLightMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+  // Pole light material
+  const poleLightMaterial = new THREE.MeshBasicMaterial({ color: 0xffcb90 });
+
+  // 8. 加载3D模型
+  const modelPath = `${import.meta.env.BASE_URL}models/portal/portal.glb`; // 文件路径：/public/models/Duck
+  gltfLoader.load(
+    modelPath,
+    // 加载成功回调
+    (gltf) => {
+      const bakedMesh = gltf.scene.children.find(
+        (child) => child.name === "baked"
+      );
+      const portalLightMesh = gltf.scene.children.find(
+        (child) => child.name === "portalLight"
+      );
+      const poleLightAMesh = gltf.scene.children.find(
+        (child) => child.name === "poleLightA"
+      );
+      const poleLightBMesh = gltf.scene.children.find(
+        (child) => child.name === "poleLightB"
+      );
+
+      bakedMesh.material = bakedMaterial;
+      poleLightAMesh.material = poleLightMaterial;
+      poleLightBMesh.material = poleLightMaterial;
+      portalLightMesh.material = portalLightMaterial;
+
+      console.log(gltf.scene);
+      scene.add(gltf.scene);
+
+      // updateAllMaterials(gltf.scene);
+    },
+    // 加载进度回调
+    (xhr) => {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
+    // 加载错误回调
+    (error) => {
+      console.error("加载失败：", error);
+    }
+  );
   // 模型mesh==========================
   // 9. 创建相机
   camera = new THREE.PerspectiveCamera(

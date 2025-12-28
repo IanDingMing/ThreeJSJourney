@@ -163,11 +163,11 @@ onMounted(() => {
   });
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(sizes.pixelRatio);
-  renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ReinhardToneMapping;
-  renderer.toneMappingExposure = 3;
+  // renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
+  // renderer.shadowMap.enabled = true;
+  // renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // renderer.toneMapping = THREE.ReinhardToneMapping;
+  // renderer.toneMappingExposure = 3;
   webgl.value!.appendChild(renderer.domElement);
 
   // 4. 创建自定义幕布（Overlay）
@@ -190,7 +190,7 @@ onMounted(() => {
     `,
   });
   const overlay = new THREE.Mesh(overlayGeometry, overlayMaterial);
-  scene.add(overlay);
+  // scene.add(overlay);
 
   // 5. 创建加载管理器
   let sceneReady = false;
@@ -237,70 +237,63 @@ onMounted(() => {
   const gltfLoader = new GLTFLoader(loadingManager);
 
   // 7. 加载环境贴图
-  const environmentMap = cubeTextureLoader.load([
-    pxEnvironmentMapsPath,
-    nxEnvironmentMapsPath,
-    pyEnvironmentMapsPath,
-    nyEnvironmentMapsPath,
-    pzEnvironmentMapsPath,
-    nzEnvironmentMapsPath,
-  ]);
-  environmentMap.colorSpace = THREE.SRGBColorSpace;
-  scene.background = environmentMap;
-  scene.environment = environmentMap;
+  // const environmentMap = cubeTextureLoader.load([
+  //   pxEnvironmentMapsPath,
+  //   nxEnvironmentMapsPath,
+  //   pyEnvironmentMapsPath,
+  //   nyEnvironmentMapsPath,
+  //   pzEnvironmentMapsPath,
+  //   nzEnvironmentMapsPath,
+  // ]);
+  // environmentMap.colorSpace = THREE.SRGBColorSpace;
+  // scene.background = environmentMap;
+  // scene.environment = environmentMap;
 
   // 模型mesh==========================
   // 8. 加载3D模型
-  const modelPath = `${
-    import.meta.env.BASE_URL
-  }models/DamagedHelmet/glTF/DamagedHelmet.gltf`; // 文件路径：/public/models/Duck
-  gltfLoader.load(
-    modelPath,
-    // 加载成功回调
-    (gltf) => {
-      gltf.scene.scale.set(2.5, 2.5, 2.5);
-      gltf.scene.rotation.y = Math.PI * 0.5;
-      scene.add(gltf.scene);
+  // const modelPath = `${
+  //   import.meta.env.BASE_URL
+  // }models/DamagedHelmet/glTF/DamagedHelmet.gltf`; // 文件路径：/public/models/Duck
+  // gltfLoader.load(
+  //   modelPath,
+  //   // 加载成功回调
+  //   (gltf) => {
+  //     gltf.scene.scale.set(2.5, 2.5, 2.5);
+  //     gltf.scene.rotation.y = Math.PI * 0.5;
+  //     scene.add(gltf.scene);
 
-      updateAllMaterials(scene);
-    },
-    // 加载进度回调
-    (xhr) => {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    // 加载错误回调
-    (error) => {
-      console.error("加载失败：", error);
-    }
-  );
+  //     updateAllMaterials(scene);
+  //   },
+  //   // 加载进度回调
+  //   (xhr) => {
+  //     console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+  //   },
+  //   // 加载错误回调
+  //   (error) => {
+  //     console.error("加载失败：", error);
+  //   }
+  // );
 
   /**
-   * Points of interest
+   * Object
    */
-  const raycaster = new THREE.Raycaster();
-  const points = [
-    {
-      position: new THREE.Vector3(1.55, 0.3, -0.6),
-      element: document.querySelector(".point-0"),
-    },
-    {
-      position: new THREE.Vector3(0.5, 0.8, -1.6),
-      element: document.querySelector(".point-1"),
-    },
-    {
-      position: new THREE.Vector3(1.6, -1.3, -0.7),
-      element: document.querySelector(".point-2"),
-    },
-  ];
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial()
+  );
+
+  scene.add(cube);
   // 模型mesh==========================
   // 9. 创建相机
   camera = new THREE.PerspectiveCamera(
-    75,
+    45,
     sizes.width / sizes.height,
     0.1,
     100
   );
-  camera.position.set(4, 1, -4);
+  camera.position.x = 4;
+  camera.position.y = 2;
+  camera.position.z = 4;
   scene.add(camera);
 
   // 10. 创建控制器
@@ -308,13 +301,13 @@ onMounted(() => {
   controls.enableDamping = true;
 
   // 11. 添加灯光
-  const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
-  directionalLight.castShadow = true;
-  directionalLight.shadow.camera.far = 15;
-  directionalLight.shadow.mapSize.set(1024, 1024);
-  directionalLight.shadow.normalBias = 0.05;
-  directionalLight.position.set(0.25, 3, -2.25);
-  scene.add(directionalLight);
+  // const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
+  // directionalLight.castShadow = true;
+  // directionalLight.shadow.camera.far = 15;
+  // directionalLight.shadow.mapSize.set(1024, 1024);
+  // directionalLight.shadow.normalBias = 0.05;
+  // directionalLight.position.set(0.25, 3, -2.25);
+  // scene.add(directionalLight);
 
   // 12. 添加辅助工具
   const axesHelper = new THREE.AxesHelper(5); //创建一个坐标轴辅助对象
@@ -334,49 +327,6 @@ onMounted(() => {
 
     // Update controls
     controls.update();
-
-    // Update points only when the scene is ready
-    if (sceneReady) {
-      // Go through each point
-      for (const point of points) {
-        // Get 2D screen position
-        const screenPosition = point.position.clone();
-        screenPosition.project(camera);
-
-        // Set the raycaster
-        raycaster.setFromCamera(screenPosition, camera);
-        const intersects = raycaster.intersectObjects(scene.children, true);
-
-        if (!point.element) return;
-        // No intersect found
-        if (intersects.length === 0) {
-          // Show
-          point.element.classList.add("visible");
-        }
-
-        // Intersect found
-        else {
-          // Get the distance of the intersection and the distance of the point
-          const intersectionDistance = intersects[0].distance;
-          const pointDistance = point.position.distanceTo(camera.position);
-
-          // Intersection is close than the point
-          if (intersectionDistance < pointDistance) {
-            // Hide
-            point.element.classList.remove("visible");
-          }
-          // Intersection is further than the point
-          else {
-            // Show
-            point.element.classList.add("visible");
-          }
-        }
-
-        const translateX = screenPosition.x * sizes.width * 0.5;
-        const translateY = -screenPosition.y * sizes.height * 0.5;
-        point.element.style.transform = `translateX(${translateX}px) translateY(${translateY}px)`;
-      }
-    }
 
     renderer.render(scene, camera); //执行渲染操作
     requestAnimationFrame(render); //请求再次执行函数render
@@ -417,27 +367,6 @@ onUnmounted(() => {
   <div class="container">
     <div ref="webgl" class="webgl"></div>
     <div ref="loadingBar" class="loading-bar"></div>
-
-    <div class="point point-0">
-      <div class="label">1</div>
-      <div class="text">
-        Front and top screen with HUD aggregating terrain and battle
-        informations.
-      </div>
-    </div>
-    <div class="point point-1">
-      <div class="label">2</div>
-      <div class="text">
-        Ventilation with air purifier and detection of environment toxicity.
-      </div>
-    </div>
-    <div class="point point-2">
-      <div class="label">3</div>
-      <div class="text">
-        Cameras supporting night vision and heat vision with automatic
-        adjustment.
-      </div>
-    </div>
   </div>
 </template>
 

@@ -37,8 +37,10 @@ import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js
 import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer.js";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import * as CANNON from "cannon-es";
-import terrainVertexShader from "@/shaders/terrain/vertex.glsl";
-import terrainFragmentShader from "@/shaders/terrain/fragment.glsl";
+import firefliesVertexShader from "@/shaders/fireflies/vertex.glsl";
+import firefliesFragmentShader from "@/shaders/fireflies/fragment.glsl";
+import portalVertexShader from "@/shaders/portal/vertex.glsl";
+import portalFragmentShader from "@/shaders/portal/fragment.glsl";
 import gpgpuParticlesShader from "@/shaders/gpgpu/particles.glsl";
 import pxEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/px.jpg";
 import nxEnvironmentMapsPath from "@/assets/textures/environmentMaps/0/nx.jpg";
@@ -73,6 +75,7 @@ sizes.resolution.set(
  */
 const webgl = useTemplateRef("webgl");
 const loadingBar = useTemplateRef("loadingBar");
+const htmlOverlay = useTemplateRef("htmlOverlay");
 
 /**
  * 全局变量声明
@@ -85,7 +88,6 @@ const gui: GUI = new GUI();
 const meshArray: THREE.Mesh[] = [];
 const global = { envMapIntensity: 2.5 };
 let model: THREE.Group | null = null;
-let overlayMaterial: THREE.ShaderMaterial | null = null;
 
 /**
  * 事件处理函数
@@ -156,44 +158,25 @@ onMounted(() => {
   // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 3. 创建渲染器
-  const rendererParameters = { clearColor: "#29191f" };
+  const rendererParameters = { clearColor: "#201919" };
   renderer = new THREE.WebGLRenderer({
     powerPreference: "high-performance", // 电源模式
     antialias: true,
   });
   renderer.setSize(sizes.width, sizes.height); //设置three.js渲染区域的尺寸(像素px)
   renderer.setPixelRatio(sizes.pixelRatio);
-  // renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
+  renderer.setClearColor(rendererParameters.clearColor); //设置渲染器的背景颜色
   // renderer.shadowMap.enabled = true;
   // renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // renderer.toneMapping = THREE.ReinhardToneMapping;
   // renderer.toneMappingExposure = 3;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   webgl.value!.appendChild(renderer.domElement);
-
-  // 4. 创建自定义幕布（Overlay）
-  const overlayGeometry = new THREE.PlaneGeometry(2, 2, 1, 1);
-  overlayMaterial = new THREE.ShaderMaterial({
-    transparent: true,
-    uniforms: {
-      uAlpha: { value: 1 },
-    },
-    vertexShader: `
-      void main() {
-        gl_Position = vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform float uAlpha;
-      void main() {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, uAlpha);
-      }
-    `,
+  gui.addColor(rendererParameters, "clearColor").onChange(() => {
+    renderer.setClearColor(rendererParameters.clearColor);
   });
-  const overlay = new THREE.Mesh(overlayGeometry, overlayMaterial);
-  scene.add(overlay);
 
-  // 5. 创建加载管理器
+  // 4. 创建加载管理器
   let sceneReady = false;
   const loadingManager = new THREE.LoadingManager();
   loadingManager.onStart = () => {
@@ -202,20 +185,26 @@ onMounted(() => {
   loadingManager.onLoad = () => {
     console.log("Loading complete");
     // Wait a little
-    window.setTimeout(() => {
-      // Animate overlay
-      gsap.to(overlayMaterial.uniforms.uAlpha, {
-        duration: 3,
-        value: 0,
-        delay: 1,
-      });
+    setTimeout(() => {
+      // 使用 gsap 淡出 HTML 幕布
+      if (htmlOverlay.value) {
+        gsap.to(htmlOverlay.value, {
+          duration: 3,
+          opacity: 0,
+          delay: 1,
+          onComplete: () => {
+            // 淡出完成后可以移除元素或保持隐藏
+            htmlOverlay.value.style.display = "none";
+          },
+        });
+      }
 
-      // Update loadingBarElement
+      // 更新 loadingBarElement
       loadingBar.value.classList.add("ended");
       loadingBar.value.style.transform = "";
     }, 500);
 
-    window.setTimeout(() => {
+    setTimeout(() => {
       sceneReady = true;
     }, 2000);
   };
@@ -231,13 +220,13 @@ onMounted(() => {
     console.log(`There was an error loading ${url}`);
   };
 
-  // 6. 创建加载器（使用同一个loadingManager）
+  // 5. 创建加载器（使用同一个loadingManager）
   const texturesLoader = new THREE.TextureLoader(loadingManager);
   const rgbeLoader = new RGBELoader(loadingManager);
   const cubeTextureLoader = new THREE.CubeTextureLoader(loadingManager);
   const gltfLoader = new GLTFLoader(loadingManager);
 
-  // 7. 加载环境贴图
+  // 6. 加载环境贴图
   // const environmentMap = cubeTextureLoader.load([
   //   pxEnvironmentMapsPath,
   //   nxEnvironmentMapsPath,
@@ -266,12 +255,34 @@ onMounted(() => {
   const bakedMaterial = new THREE.MeshBasicMaterial({ map: bakedTexture });
 
   // Portal light material
-  const portalLightMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const debugObject = {
+    portalColorStart: "#000000",
+    portalColorEnd: "#ffffff",
+  };
+  const portalLightMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColorStart: { value: new THREE.Color(debugObject.portalColorStart) },
+      uColorEnd: { value: new THREE.Color(debugObject.portalColorEnd) },
+    },
+    vertexShader: portalVertexShader,
+    fragmentShader: portalFragmentShader,
+  });
+  gui.addColor(debugObject, "portalColorStart").onChange(() => {
+    portalLightMaterial.uniforms.uColorStart.value.set(
+      debugObject.portalColorStart
+    );
+  });
+  gui.addColor(debugObject, "portalColorEnd").onChange(() => {
+    portalLightMaterial.uniforms.uColorEnd.value.set(
+      debugObject.portalColorEnd
+    );
+  });
 
   // Pole light material
   const poleLightMaterial = new THREE.MeshBasicMaterial({ color: 0xffcb90 });
 
-  // 8. 加载3D模型
+  // 7. 加载3D模型
   const modelPath = `${import.meta.env.BASE_URL}models/portal/portal.glb`; // 文件路径：/public/models/Duck
   gltfLoader.load(
     modelPath,
@@ -309,8 +320,56 @@ onMounted(() => {
       console.error("加载失败：", error);
     }
   );
+
+  /**
+   * FireFlies
+   */
+  // Geometry
+  const firefliesGometry = new THREE.BufferGeometry();
+  const firefilesCount = 30;
+  const positionArray = new Float32Array(firefilesCount * 3);
+  const scaleArray = new Float32Array(firefilesCount * 1);
+
+  for (let i = 0; i < firefilesCount; i++) {
+    positionArray[i * 3 + 0] = (Math.random() - 0.5) * 4;
+    positionArray[i * 3 + 1] = Math.random() * 1.5;
+    positionArray[i * 3 + 2] = (Math.random() - 0.5) * 4;
+
+    scaleArray[i] = Math.random();
+  }
+
+  firefliesGometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(positionArray, 3)
+  );
+  firefliesGometry.setAttribute(
+    "aScale",
+    new THREE.BufferAttribute(scaleArray, 1)
+  );
+
+  // Material
+  const firefliesMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uPixelRatio: { value: sizes.pixelRatio },
+      uSize: { value: 100 },
+    },
+    vertexShader: firefliesVertexShader,
+    fragmentShader: firefliesFragmentShader,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  gui
+    .add(firefliesMaterial.uniforms.uSize, "value", 0, 500, 1)
+    .name("firefliesSize");
+
+  // Points
+  const fireflies = new THREE.Points(firefliesGometry, firefliesMaterial);
+  scene.add(fireflies);
+
   // 模型mesh==========================
-  // 9. 创建相机
+  // 8. 创建相机
   camera = new THREE.PerspectiveCamera(
     45,
     sizes.width / sizes.height,
@@ -322,11 +381,11 @@ onMounted(() => {
   camera.position.z = 4;
   scene.add(camera);
 
-  // 10. 创建控制器
+  // 9. 创建控制器
   controls = new OrbitControls(camera, webgl.value);
   controls.enableDamping = true;
 
-  // 11. 添加灯光
+  // 10. 添加灯光
   // const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
   // directionalLight.castShadow = true;
   // directionalLight.shadow.camera.far = 15;
@@ -335,11 +394,11 @@ onMounted(() => {
   // directionalLight.position.set(0.25, 3, -2.25);
   // scene.add(directionalLight);
 
-  // 12. 添加辅助工具
+  // 11. 添加辅助工具
   const axesHelper = new THREE.AxesHelper(5); //创建一个坐标轴辅助对象
   scene.add(axesHelper); //将坐标轴辅助对象添加到网格模型中
 
-  // 13. 动画循环
+  // 12. 动画循环
   const clock = new THREE.Clock(); //创建一个时钟对象，用于计算时间差
   function render() {
     stats.begin();
@@ -347,6 +406,10 @@ onMounted(() => {
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
+
+    // Update material
+    firefliesMaterial.uniforms.uTime.value = elapsedTime;
+    portalLightMaterial.uniforms.uTime.value = elapsedTime;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -360,7 +423,7 @@ onMounted(() => {
   }
   render();
 
-  // 14. 添加事件监听
+  // 13. 添加事件监听
   window.addEventListener("resize", handleResize);
 });
 
@@ -393,6 +456,7 @@ onUnmounted(() => {
   <div class="container">
     <div ref="webgl" class="webgl"></div>
     <div ref="loadingBar" class="loading-bar"></div>
+    <div ref="htmlOverlay" class="html-overlay"></div>
   </div>
 </template>
 
@@ -438,6 +502,7 @@ section:nth-child(odd) {
   transform: scaleX(0.3);
   transform-origin: top left;
   transition: transform 0.5s;
+  z-index: 1001; /* 在幕布之上 */
 }
 
 .loading-bar.ended {
@@ -445,6 +510,20 @@ section:nth-child(odd) {
   transform-origin: 100% 0;
   transition: transform 1.5s ease-in-out;
 }
+
+/* HTML 幕布样式 */
+.html-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000000;
+  opacity: 1; /* 初始完全显示 */
+  z-index: 1000; /* 在 Three.js 画布之上 */
+  pointer-events: none; /* 允许点击穿透到 Three.js 画布 */
+}
+
 .point {
   position: absolute;
   top: 50%;

@@ -502,7 +502,7 @@ section:nth-child(odd) {
   transform: scaleX(0.3);
   transform-origin: top left;
   transition: transform 0.5s;
-  z-index: 1003; /* 在幕布之上 */
+  z-index: 1001; /* 在幕布之上 */
 }
 
 .loading-bar.ended {
@@ -520,7 +520,7 @@ section:nth-child(odd) {
   height: 100vh;
   background-color: #000000;
   opacity: 1; /* 初始完全显示 */
-  z-index: 1002; /* 在 Three.js 画布之上 li.gui是z-index:1001*/
+  z-index: 1000; /* 在 Three.js 画布之上 */
   pointer-events: none; /* 允许点击穿透到 Three.js 画布 */
 }
 

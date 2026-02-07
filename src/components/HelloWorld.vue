@@ -67,15 +67,13 @@ const sizes = {
 };
 sizes.resolution.set(
   sizes.width * sizes.pixelRatio,
-  sizes.height * sizes.pixelRatio
+  sizes.height * sizes.pixelRatio,
 );
 
 /**
  * DOM引用
  */
 const webgl = useTemplateRef("webgl");
-const loadingBar = useTemplateRef("loadingBar");
-const htmlOverlay = useTemplateRef("htmlOverlay");
 
 /**
  * 全局变量声明
@@ -102,7 +100,7 @@ const handleResize = () => {
   sizes.pixelRatio = Math.min(window.devicePixelRatio, 2);
   sizes.resolution.set(
     sizes.width * sizes.pixelRatio,
-    sizes.height * sizes.pixelRatio
+    sizes.height * sizes.pixelRatio,
   );
 
   // 更新相机和渲染器
@@ -155,7 +153,6 @@ onMounted(() => {
 
   // 2. 创建场景
   const scene = new THREE.Scene();
-  // scene.background = new THREE.Color("#262837"); //设置场景背景颜色
 
   // 3. 创建渲染器
   const rendererParameters = { clearColor: "#201919" };
@@ -177,44 +174,17 @@ onMounted(() => {
   });
 
   // 4. 创建加载管理器
-  let sceneReady = false;
   const loadingManager = new THREE.LoadingManager();
   loadingManager.onStart = () => {
     console.log("Loading started");
   };
   loadingManager.onLoad = () => {
     console.log("Loading complete");
-    // Wait a little
-    setTimeout(() => {
-      // 使用 gsap 淡出 HTML 幕布
-      if (htmlOverlay.value) {
-        gsap.to(htmlOverlay.value, {
-          duration: 3,
-          opacity: 0,
-          delay: 1,
-          onComplete: () => {
-            // 淡出完成后可以移除元素或保持隐藏
-            htmlOverlay.value.style.display = "none";
-          },
-        });
-      }
-
-      // 更新 loadingBarElement
-      loadingBar.value.classList.add("ended");
-      loadingBar.value.style.transform = "";
-    }, 500);
-
-    setTimeout(() => {
-      sceneReady = true;
-    }, 2000);
   };
   loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
     console.log(
-      `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`
+      `Loading file: ${url}. Loaded ${itemsLoaded} of ${itemsTotal} files.`,
     );
-    // 计算进度并更新
-    const progressRatio = itemsLoaded / itemsTotal;
-    loadingBar.value.style.transform = `scaleX(${progressRatio})`;
   };
   loadingManager.onError = (url) => {
     console.log(`There was an error loading ${url}`);
@@ -240,145 +210,20 @@ onMounted(() => {
   // scene.environment = environmentMap;
 
   // 模型mesh==========================
-  /**
-   * Textures
-   */
-  const bakedTexture = texturesLoader.load(
-    `${import.meta.env.BASE_URL}models/portal/baked.jpg`
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1), //创建一个立方体几何体
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }), //创建一个红色材质
   );
-  bakedTexture.flipY = false;
-  bakedTexture.colorSpace = THREE.SRGBColorSpace;
-
-  /**
-   * Materials
-   */
-  const bakedMaterial = new THREE.MeshBasicMaterial({ map: bakedTexture });
-
-  // Portal light material
-  const debugObject = {
-    portalColorStart: "#000000",
-    portalColorEnd: "#ffffff",
-  };
-  const portalLightMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uColorStart: { value: new THREE.Color(debugObject.portalColorStart) },
-      uColorEnd: { value: new THREE.Color(debugObject.portalColorEnd) },
-    },
-    vertexShader: portalVertexShader,
-    fragmentShader: portalFragmentShader,
-  });
-  gui.addColor(debugObject, "portalColorStart").onChange(() => {
-    portalLightMaterial.uniforms.uColorStart.value.set(
-      debugObject.portalColorStart
-    );
-  });
-  gui.addColor(debugObject, "portalColorEnd").onChange(() => {
-    portalLightMaterial.uniforms.uColorEnd.value.set(
-      debugObject.portalColorEnd
-    );
-  });
-
-  // Pole light material
-  const poleLightMaterial = new THREE.MeshBasicMaterial({ color: 0xffcb90 });
-
-  // 7. 加载3D模型
-  const modelPath = `${import.meta.env.BASE_URL}models/portal/portal.glb`; // 文件路径：/public/models/Duck
-  gltfLoader.load(
-    modelPath,
-    // 加载成功回调
-    (gltf) => {
-      const bakedMesh = gltf.scene.children.find(
-        (child) => child.name === "baked"
-      );
-      const portalLightMesh = gltf.scene.children.find(
-        (child) => child.name === "portalLight"
-      );
-      const poleLightAMesh = gltf.scene.children.find(
-        (child) => child.name === "poleLightA"
-      );
-      const poleLightBMesh = gltf.scene.children.find(
-        (child) => child.name === "poleLightB"
-      );
-
-      bakedMesh.material = bakedMaterial;
-      poleLightAMesh.material = poleLightMaterial;
-      poleLightBMesh.material = poleLightMaterial;
-      portalLightMesh.material = portalLightMaterial;
-
-      console.log(gltf.scene);
-      scene.add(gltf.scene);
-
-      // updateAllMaterials(gltf.scene);
-    },
-    // 加载进度回调
-    (xhr) => {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    // 加载错误回调
-    (error) => {
-      console.error("加载失败：", error);
-    }
-  );
-
-  /**
-   * FireFlies
-   */
-  // Geometry
-  const firefliesGometry = new THREE.BufferGeometry();
-  const firefilesCount = 30;
-  const positionArray = new Float32Array(firefilesCount * 3);
-  const scaleArray = new Float32Array(firefilesCount * 1);
-
-  for (let i = 0; i < firefilesCount; i++) {
-    positionArray[i * 3 + 0] = (Math.random() - 0.5) * 4;
-    positionArray[i * 3 + 1] = Math.random() * 1.5;
-    positionArray[i * 3 + 2] = (Math.random() - 0.5) * 4;
-
-    scaleArray[i] = Math.random();
-  }
-
-  firefliesGometry.setAttribute(
-    "position",
-    new THREE.BufferAttribute(positionArray, 3)
-  );
-  firefliesGometry.setAttribute(
-    "aScale",
-    new THREE.BufferAttribute(scaleArray, 1)
-  );
-
-  // Material
-  const firefliesMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uPixelRatio: { value: sizes.pixelRatio },
-      uSize: { value: 100 },
-    },
-    vertexShader: firefliesVertexShader,
-    fragmentShader: firefliesFragmentShader,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  gui
-    .add(firefliesMaterial.uniforms.uSize, "value", 0, 500, 1)
-    .name("firefliesSize");
-
-  // Points
-  const fireflies = new THREE.Points(firefliesGometry, firefliesMaterial);
-  scene.add(fireflies);
-
+  scene.add(cube); //将立方体添加到组对象中
   // 模型mesh==========================
   // 8. 创建相机
   camera = new THREE.PerspectiveCamera(
     45,
     sizes.width / sizes.height,
     0.1,
-    100
+    100,
   );
-  camera.position.x = 4;
-  camera.position.y = 2;
-  camera.position.z = 4;
+  camera.position.set(4, 2, 4);
   scene.add(camera);
 
   // 9. 创建控制器
@@ -406,10 +251,6 @@ onMounted(() => {
 
     const deltaTime = clock.getDelta();
     const elapsedTime = clock.elapsedTime; //获取自创建时钟以来的时间
-
-    // Update material
-    firefliesMaterial.uniforms.uTime.value = elapsedTime;
-    portalLightMaterial.uniforms.uTime.value = elapsedTime;
 
     // Animate meshes
     meshArray.forEach((mesh) => {});
@@ -455,8 +296,6 @@ onUnmounted(() => {
 <template>
   <div class="container">
     <div ref="webgl" class="webgl"></div>
-    <div ref="loadingBar" class="loading-bar"></div>
-    <div ref="htmlOverlay" class="html-overlay"></div>
   </div>
 </template>
 
@@ -473,108 +312,5 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   position: fixed;
-}
-
-.section {
-  display: flex;
-  align-items: center;
-  height: 100vh;
-  position: relative;
-  font-family: "Cabin", sans-serif;
-  color: #ffeded;
-  text-transform: uppercase;
-  font-size: 7vmin;
-  padding-left: 10%;
-  padding-right: 10%;
-  /* background-color: blue; */
-}
-
-section:nth-child(odd) {
-  justify-content: flex-end;
-}
-
-.loading-bar {
-  position: absolute;
-  top: 50%;
-  width: 100%;
-  height: 2px;
-  background: #ffffff;
-  transform: scaleX(0.3);
-  transform-origin: top left;
-  transition: transform 0.5s;
-  z-index: 1001; /* 在幕布之上 */
-}
-
-.loading-bar.ended {
-  transform: scaleX(0);
-  transform-origin: 100% 0;
-  transition: transform 1.5s ease-in-out;
-}
-
-/* HTML 幕布样式 */
-.html-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: #000000;
-  opacity: 1; /* 初始完全显示 */
-  z-index: 1000; /* 在 Three.js 画布之上 */
-  pointer-events: none; /* 允许点击穿透到 Three.js 画布 */
-}
-
-.point {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  /* pointer-events: none; */
-}
-
-.point .label {
-  position: absolute;
-  top: -20px;
-  left: -20px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #00000077;
-  border: 1px solid #ffffff77;
-  color: #ffffff;
-  font-family: Helvetica, Arial, sans-serif;
-  text-align: center;
-  line-height: 40px;
-  font-weight: 100;
-  font-size: 14px;
-  cursor: help;
-  transform: scale(0, 0);
-  transition: transform 0.3s;
-}
-
-.point .text {
-  position: absolute;
-  top: 30px;
-  left: -120px;
-  width: 200px;
-  padding: 20px;
-  border-radius: 4px;
-  background: #00000077;
-  border: 1px solid #ffffff77;
-  color: #ffffff;
-  line-height: 1.3em;
-  font-family: Helvetica, Arial, sans-serif;
-  font-weight: 100;
-  font-size: 14px;
-  opacity: 0;
-  transition: opacity 0.3s;
-  pointer-events: none;
-}
-
-.point:hover .text {
-  opacity: 1;
-}
-
-.point.visible .label {
-  transform: scale(1, 1);
 }
 </style>

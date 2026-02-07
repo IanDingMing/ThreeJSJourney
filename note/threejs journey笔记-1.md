@@ -11,8 +11,14 @@
    npm install vite-plugin-glsl --save-dev
    ```
 
-   
+   或者出现版本问题，可安装最新版
 
+   ```
+   npm install vite-plugin-glsl@latest --save-dev
+   ```
+   
+   
+   
 2. **配置 Vite**
    在项目的 `vite.config.js`（或 `vite.config.ts`）文件中引入并启用插件：
 
